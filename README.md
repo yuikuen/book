@@ -1,4 +1,5 @@
 ---
+cover: .gitbook/assets/wallhaven-3z1kx6_1920x1080.png
 coverY: 0
 ---
 
