@@ -5,6 +5,4 @@ coverY: 0
 
 # Welcome!
 
-## Welcome aboard!
-
-Welcome to the company wiki! Here you'll find everything you need to know about the company.
+> 此书为个人的实践记录，主要是为了方便自己翻阅，并且可以当作笔记 
