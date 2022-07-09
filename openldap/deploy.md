@@ -2,6 +2,24 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## 安装 OpenLDAP
 
 1. 环境配置，关闭 SELinux 和 Firewalld
