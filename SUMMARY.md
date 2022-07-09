@@ -16,10 +16,14 @@
 
 ## OpenLDAP
 
-* [服务简介](openldap/fu-wu-jian-jie.md)
-* [服务部署](openldap/fu-wu-bu-shu.md)
-* [服务应用](openldap/fu-wu-ying-yong.md)
+* [服务简介](openldap/project.md)
+* [服务部署](openldap/deploy.md)
+* [服务应用](openldap/use.md)
+* [服务问题](openldap/bug.md)
 
 ## Gerrit
 
-* [Page 1](gerrit/page-1.md)
+* [服务简介](gerrit/project.md)
+* [服务部署](gerrit/deploy.md)
+* [服务应用](gerrit/use.md)
+* [服务问题](gerrit/bug.md)
