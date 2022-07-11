@@ -15,7 +15,7 @@
 ## OpenLDAP
 
 * [服务简介](openldap/project.md)
-* [服务部署](openldap/fu-wu-bu-shu.md)
+* [服务部署](openldap/deploy-yum.md)
 * [服务应用](openldap/use.md)
 * [服务问题](openldap/bug.md)
 
