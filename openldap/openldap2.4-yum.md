@@ -5,7 +5,7 @@
 - Phpldapadmin：phpldapadmin-1.2.5-1.el7.noarch
 
 ## 前置环境
-1. 演示环境，直接关闭 SELinux 和 Firewalld
+1)演示环境，直接关闭 SELinux 和 Firewalld
 
 ```bash
 $ sed -i '/SELINUX/s/enforcing/disabled/' /etc/selinux/config && setenforce 0 
@@ -13,7 +13,7 @@ $ systemctl disable --now firewalld.service
 ```
 
 ## 安装程序
-1. 执行`yum`命令进行下载安装
+1)执行`yum`命令进行下载安装
 
 ```bash
 $ yum -y install openldap compat-openldap openldap-clients openldap-servers openldap-servers-sql openldap-devel migrationtools
@@ -24,14 +24,14 @@ $ slapd -VV
         mockbuild@x86-02.bsys.centos.org:/builddir/build/BUILD/openldap-2.4.44/openldap-2.4.44/servers/slapd
 ```
 
-2. 生成管理员密码
+2)生成管理员密码
 
 ```bash
 $ slappasswd -s Admin@123
 {SSHA}GJEm8DDGliPDM+/ip/lk5d+KDBGjR9TU
 ```
 
-3. 修改配置文件，添加之前生成的密码
+3)修改配置文件，添加之前生成的密码
 
 > *从 OpenLDAP-2.4.23 版本开始所有配置数据都保存在 `/etc/openldap/slapd.d/` 中，已无slapd.conf 作为配置文件使用了*
 
@@ -50,7 +50,7 @@ olcAccess: {0}to * by dn.base="gidNumber=0+uidNumber=0,cn=peercred,cn=extern
 al,cn=auth" read by dn.base="cn=Manager,dc=yuikuen,dc=top" read by * none
 ```
 
-4. 验证配置文件是否正确
+4)验证配置文件是否正确
 
 ```bash
 $ slaptest -u
@@ -60,7 +60,7 @@ config file testing succeeded
 ```
 注：如出现 `checksum error on`，可忽略错误继续操作
 
-5. 启动服务并设置开机自启
+5)启动服务并设置开机自启
 
 ```bash
 $ systemctl enable --now slapd && systemctl status slapd
@@ -73,7 +73,7 @@ tcp6       0      0 :::389                  :::*                    LISTEN      
 
 > 安装 openldap 后，会有三个命令用于修改配置文件，分别为 ldapadd，ldapmodify，ldapdelete，顾名思义就是添加，修改和删除。需要修改或增加配置时，则需要先写一个 ldif 后缀的配置文件，然后通过命令将写的配置更新到 slapd.d 目录下的配置文件中去
 
-1. 配置数据库(OpenLDAP 默认使用的数据库是 BerkeleyDB)
+1)配置数据库(OpenLDAP 默认使用的数据库是 BerkeleyDB)
 
 ```bash
 # 程序目录内有example模版，可直接复制使用
@@ -84,7 +84,7 @@ $ chmod 700 -R /var/lib/ldap
 ```
 注：`/var/lib/ldap` 为 BerkeleyDB 数据库默认存储的路径
 
-2. 导入基本 `Schema` 文件
+2)导入基本 `Schema` 文件
 
 > schema 控制着条目有哪些对象类和属性，可自行选择导入
 
@@ -103,7 +103,7 @@ $ ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/pmi.ldif
 $ ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/ppolicy.ldif
 ```
 
-3. 修改 `migrate_common.ph` 文件，此文件主要用于生成 `ldif` 文件
+3)修改 `migrate_common.ph` 文件，此文件主要用于生成 `ldif` 文件
 
 ```bash
 $ vim /usr/share/migrationtools/migrate_common.ph +71
@@ -113,7 +113,7 @@ $DEFAULT_BASE = "dc=yuikuen,dc=top";
 $EXTENDED_SCHEMA = 1;
 ```
 
-4. 重启服务以保证配置文件生效
+4)重启服务以保证配置文件生效
 
 ```bash
 $ systemctl restart slapd
@@ -125,7 +125,7 @@ $ systemctl restart slapd
 > 以 `yuikuen.top` 为域名，并在其下创建 `Manager` 的组织角色(此用户为管理员，具有整个LDAP的权限)
 > 之后再创建两个组织单元 `People/Group`，注意此处的组织单元并不是部门的意思。
 
-1. 创建一个组织
+1)创建一个组织
 
 ```bash
 $ mkdir -p /etc/openldap/myldif
@@ -162,7 +162,7 @@ olcAccess: {1}to dn.base="" by * read
 olcAccess: {2}to * by dn="cn=Manager,dc=yuikuen,dc=top" write by * read
 ```
 
-2. 执行 `ldapadd` 命令创建组织
+2)执行 `ldapadd` 命令创建组织
 
 ```bash
 $ ldapadd -x -w "Admin@123" -D "cn=Manager,dc=yuikuen,dc=top" -f /etc/openldap/myldif/base.ldif
@@ -173,7 +173,7 @@ adding new entry "ou=People,dc=yuikuen,dc=top"
 adding new entry "ou=Group,dc=yuikuen,dc=top"
 ```
 
-3. 添加组织架构
+3)添加组织架构
 
 > 刚也说过 `People/Group` 并不是部门，只是组织单元。而现创建的才是部门或组
 > 现以IT部门为例，创建各组别 op运维、rd开发、pm项目、qa测试
@@ -202,7 +202,7 @@ objectClass: organizationalUnit
 ou: qa
 ```
 
-4. 执行创建命令并检查配置是否正确
+4)执行创建命令并检查配置是否正确
 
 ```bash
 $ ldapadd -x -w "Admin@123" -D "cn=Manager,dc=yuikuen,dc=top" -f /etc/openldap/myldif/group.ldif
@@ -288,7 +288,7 @@ result: 0 Success
 > 只是现服务下默认没有普通用户，只有刚创建好的管理员用户和基础组织架构。而 `PhpLDAPadmin` 只是个图形管理工具，
 > 因为 LDAP 的命令行管理方式对一般人来说并不是很友好，为了更好的演示用户和组的创建过程，在此使用 `PhpLDAPAdmin` 图形管理工具来进行，也可使用 `LDAP admin`。
 
-1. 安装依赖包，并下载安装 phpldapadmin
+1)安装依赖包，并下载安装 phpldapadmin
 
 ```bash
 $ yum -y install httpd php php-ldap php-gd php-mbstring php-pear php-bcmath php-xml
@@ -296,7 +296,7 @@ $ yum -y install epel-release
 $ yum --enablerepo=epel -y install phpldapadmin
 ```
 
-2. 修改配置文件，放开外网访问权限
+2)修改配置文件，放开外网访问权限
 
 ```bash
 $ vim /etc/httpd/conf.d/phpldapadmin.conf
@@ -319,7 +319,7 @@ Alias /ldapadmin /usr/share/phpldapadmin/htdocs
 </Directory>
 ```
 
-3. 修改 uid 登录方式和关闭匿名登录、用户属性的唯一性等（非必须）
+3)修改 uid 登录方式和关闭匿名登录、用户属性的唯一性等（非必须）
 
 ```bash
 $ vim /etc/phpldapadmin/config.php +398
@@ -334,7 +334,7 @@ $servers->setValue('login','anon_bind',false);
 $servers->setValue('unique','attrs',array('mail','uid','uidNumber','cn','sn'))
 ```
 
-4. 修改完成后启动服务
+4)修改完成后启动服务
 
 ```bash
 $ systemctl enable --now httpd && systemctl status httpd
@@ -353,14 +353,14 @@ $ systemctl enable --now httpd && systemctl status httpd
 
 如图所示，默认只有创建的管理员、组织和组织架构，而下面就开始创建所需的用户
 
-1. 首先第一步，创建用户，使用 sha1 存储密码，通过 userPassword 保存
+1)首先第一步，创建用户，使用 sha1 存储密码，通过 userPassword 保存
 
 ```bash
 $ slappasswd -h {sha} -s 123456
 {SHA}fEqNCco3Yq9h5ZUglD3CZJT4lBs=
 ```
 
-2. 创建新用户的 ldif 文件
+2)创建新用户的 ldif 文件
 
 ```bash
 # 再次提醒！ldif文件以空行作用用户分割，格式要保持一致！
@@ -409,7 +409,7 @@ uid: qa001
 displayName: 赵六
 ```
 
-3. 执行创建命令并查询其中一个用户测试是否成功
+3)执行创建命令并查询其中一个用户测试是否成功
 
 ```bash
 $ ldapadd -x -w "Admin@123" -D "cn=Manager,dc=yuikuen,dc=top" -f /etc/openldap/myldif/user.ldif
@@ -481,7 +481,7 @@ $ ldappasswd -h 188.188.4.140 -p 389 -x -D "cn=rd001,ou=rd，ou=People,dc=yuikue
 > OpenLDAP 加载 memberof 模块后，可通过 groupOfNames 和 memberOf 实现分组认证的功能，
 > 在 Gitlab&Jenkins 等系统上都能作为过滤组用户来使用，为此在创建部门组前进行添加。
 
-1. 创建 `module_group.sh`
+1)创建 `module_group.sh`
 
 ```bash
 $ vim module_group.sh
@@ -501,7 +501,7 @@ adding new entry "cn=module,cn=config"
 modifying entry "cn=module{0},cn=config"
 ```
 
-2. 创建 `group_objectClass.sh`
+2)创建 `group_objectClass.sh`
 
 ```bash
 $ vim group_objectClass.sh
@@ -528,7 +528,7 @@ adding new entry "olcOverlay=memberof,olcDatabase={2}hdb,cn=config"
 > - posixGroup：代表传统 unix 组，由 gidNUmber 和列表 memberUid 标识
 > 注：OpenLDAP 用户和用户组之间默认是没有任何关联的，需要将新建或原用户，添加到指定用户组的 ldif 文件内
 
-1. 在 Group 单元组织下添加分组，并将用户绑定
+1)在 Group 单元组织下添加分组，并将用户绑定
 
 ```bash
 $ vim addgroup.ldif
@@ -554,7 +554,7 @@ cn: qa
 member: cn=qa001,ou=qa,ou=People,dc=yuikuen,dc=top
 ```
 
-2. 执行命令进行创建绑定
+2)执行命令进行创建绑定
 
 ```bash
 $ ldapmodify -a -H ldap://188.188.4.140:389 -D "cn=Manager,dc=yuikuen,dc=top" -w Admin@123 -f addgroup.ldif
@@ -567,7 +567,7 @@ adding new entry "cn=qa,ou=Group,dc=yuikuen,dc=top"
 
 ![image-20220704114738101](https://yuikuen-1259273046.cos.ap-guangzhou.myqcloud.com/devops/image-20220704114738101.png)
 
-3. 添加其他用户至指定组中（现李四需接手测试的工作，将 op001 添加到 cn=qa）
+3)添加其他用户至指定组中（现李四需接手测试的工作，将 op001 添加到 cn=qa）
 
 ```bash
 $ vim newaddgroup.ldif
@@ -579,7 +579,7 @@ member: cn=op001,ou=qa,ou=People,dc=yuikuen,dc=top
 $ ldapmodify -a -H ldap://188.188.4.44:389 -D "cn=Manager,dc=yuikuen,dc=top" -w Admin@123 -f newaddgroup.ldif
 ```
 
-4. 从 group 下移除 user（现赵六离职，需从组内移除此人）
+4)从 group 下移除 user（现赵六离职，需从组内移除此人）
 
 ```bash
 $ vim removeuser.sh
