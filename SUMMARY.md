@@ -15,8 +15,8 @@
 ## OpenLDAP
 
 * [服务简介](openldap/project.md)
-* [服务部署](openldap/deploy-yum.md)
-* [服务应用](openldap/use.md)
+* [OpenLDAP(yum)安装2.4.44](openldap/openldap-yum.md)
+* [OpenLDAP创建用户&用户组](openldap/openldap-users.md)
 * [服务问题](openldap/bug.md)
 
 ## Gerrit

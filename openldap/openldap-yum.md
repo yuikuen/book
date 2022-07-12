@@ -1,4 +1,8 @@
-# OpenLDAP(yum)部署
+# OpenLDAP(yum)安装2.4.44
+
+**程序版本：**
+- OpenLDAP：openldap-2.4.44-25.el7_9.x86_64
+- Phpldapadmin：phpldapadmin-1.2.5-1.el7.noarch
 
 ## 前置环境
 1. 演示环境，直接关闭 SELinux 和 Firewalld
