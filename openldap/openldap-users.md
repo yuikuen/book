@@ -45,15 +45,15 @@ $ ldapadd -x -w admin@123 -D cn=Manager,dc=yuikuen,dc=top -f /root/groups.ldif
 【注：因我之前已提前创建好，一般默认是只有管理员 cn=admin】
 **先创建 OU 组织单元**
 
-1. 创建 OU 组：Groups 和 People，点击 `dc=yuikuen,dc=top`，然后点击创建一个子条目
+1)创建 OU 组：Groups 和 People，点击 `dc=yuikuen,dc=top`，然后点击创建一个子条目
 
 ![image-20220629112645781](https://yuikuen-1259273046.cos.ap-guangzhou.myqcloud.com/devops/image-20220629112645781.png)
 
-2. 点击 `Generic Organisational Unit`
+2)点击 `Generic Organisational Unit`
 
 ![image-20220629112928811](https://yuikuen-1259273046.cos.ap-guangzhou.myqcloud.com/devops/image-20220629112928811.png)
 
-3. 输入 OU 名称为 Groups，然后创建对象，直接点击提交，完成提交之后 Groups 就创建成功
+1. 输入 OU 名称为 Groups，然后创建对象，直接点击提交，完成提交之后 Groups 就创建成功
 
 ![image-20220629113156909](https://yuikuen-1259273046.cos.ap-guangzhou.myqcloud.com/devops/image-20220629113156909.png)
 
