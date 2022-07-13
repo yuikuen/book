@@ -47,6 +47,7 @@
 
 ## Shell
 
-### Test
-
-* [Redis一键安装脚本](shell/shell-refer/redis-install.md)
+* [CentOS7.x内核升级脚本](shell/auto-kernel_update.md)
+* [Reids一键安装指定release脚本](shell/auto-redis_install.md)
+* [CentOS初始化操作脚本](shell/auto-system_init.md)
+* [Linux系统基本参数巡检脚本](shell/auto-system_patrol.md)
