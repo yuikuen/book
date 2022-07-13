@@ -6,11 +6,11 @@
 
 **官网信息**
 
-- [HomePage] https://www.gerritcodereview.com/
-- [Downloads] https://gerrit-releases.storage.googleapis.com/index.html
-- [Docs] https://gerrit-review.googlesource.com/Documentation/
-- [Quickstart] https://gerrit-review.googlesource.com/Documentation/linux-quickstart.html
-- [IssuesList] https://bugs.chromium.org/p/gerrit/issues/list
+- [HomePage](https://www.gerritcodereview.com/)
+- [Downloads](https://gerrit-releases.storage.googleapis.com/index.html)
+- [Docs](https://gerrit-review.googlesource.com/Documentation/)
+- [Quickstart](https://gerrit-review.googlesource.com/Documentation/linux-quickstart.html)
+- [IssuesList](https://bugs.chromium.org/p/gerrit/issues/list)
 
 ## 前置环境
 

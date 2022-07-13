@@ -15,7 +15,7 @@
 
 ## Gerrit
 
-* [服务简介](gerrit/project.md)
+* [Gerrit集成ldap登录](gerrit/gerrit-ldap.md)
 * [Gerrit源码安装3.5.x](gerrit/gerrit-source.md)
 * [服务应用](gerrit/use.md)
 * [服务问题](gerrit/bug.md)
@@ -45,3 +45,8 @@
 * [Redis源码安装6.x](redis/redis-source.md)
 * [Redis异常问题处理集](redis/redis-bug.md)
 
+## Shell
+
+### Test
+
+* [Redis一键安装脚本](shell/shell-refer/redis-install.md)
