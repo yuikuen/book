@@ -36,6 +36,10 @@
 * [OpenLDAP创建用户&用户组](openldap/openldap-users.md)
 * [服务问题](openldap/bug.md)
 
+## RabbitMQ
+
+* [RabbitMQ(rpm)安装3.8](rabbitmq/rabbitmq-rpm.md)
+* [RabbitMQ源码安装3.9](rabbitmq/rabbitmq-source.md)
 ## Redis
 
 * [Redis6.2源码安装](redis/redis6.2-source.md)
