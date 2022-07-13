@@ -1,4 +1,4 @@
-# Redis6.2源码安装
+# Redis源码安装6.x
 
 > Redis6 以上要求 gcc 版本必须是 5 以上，而 CentOS7.x 的 gcc 版本默认为 4.8.3。Red Hat 为了软件的稳定和版本支持，yum 上版本最新也是 4.8.3，所以无法使用 yum 进行软件更新，因此需要使用 Scl。
 > Scl 软件集（Software Collections）是为了给 RHEL/CentOS 提供一种以方便、安全地安装和使用应用程序和运行时环境的多个版本方式，同时避免把系统搞乱

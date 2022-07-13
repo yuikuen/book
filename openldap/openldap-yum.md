@@ -1,4 +1,4 @@
-# OpenLDAP(yum)安装2.4.44
+# OpenLDAP(yum)安装2.4.x
 
 **程序版本：**
 - OpenLDAP：openldap-2.4.44-25.el7_9.x86_64

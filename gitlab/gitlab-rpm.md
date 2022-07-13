@@ -1,4 +1,4 @@
-# Gitlab(rpm)安装14.1.0
+# Gitlab(rpm)安装14.1.x
 
 ## 前置环境
 
