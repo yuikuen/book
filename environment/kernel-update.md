@@ -47,7 +47,7 @@ $ yum -y install kernel-ml --enablerepo=elrepo-kernel
 ## 离线安装
 
 > 实际生产环境可能需要指定内核版本，并且无法联网直接安装，需提前下载 rpm 包进行安装
-> [Centos 内核 rpm 包下载地址]:http://elrepo.org/linux/kernel/el7/x86_64/RPMS/
+> [Centos内核rpm包下载地址](http://elrepo.org/linux/kernel/el7/x86_64/RPMS/)
 
 ```bash
 $ wget https://elrepo.org/linux/kernel/el7/x86_64/RPMS/kernel-lt-5.4.182-1.el7.elrepo.x86_64.rpm
