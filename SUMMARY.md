@@ -15,9 +15,9 @@
 
 ## Gerrit
 
-* [Gerrit集成ldap登录](gerrit/gerrit-ldap.md)
 * [Gerrit源码安装3.5.x](gerrit/gerrit-source.md)
-* [服务应用](gerrit/use.md)
+* [Gerrit集成ldap登录](gerrit/gerrit-ldap.md)
+* [Gerrit安装配置GitWeb](gerrit/gerrit-gitweb.md)
 * [服务问题](gerrit/bug.md)
 
 ## Gitlab

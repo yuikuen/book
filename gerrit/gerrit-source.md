@@ -55,7 +55,7 @@ gpgkey=http://opensource.wandisco.com/RPM-GPG-KEY-WANdisco
 
 # 导入存储库并开始安装，验证版本
 $ rpm --import http://opensource.wandisco.com/RPM-GPG-KEY-WANdisco
-$ yum -y install git gitweb
+$ yum -y install git
 $ git --version
 ```
 
@@ -136,11 +136,16 @@ $ git config --global core.quotepath false
 $ git config --global i18n.logoutputencoding utf8
 $ git config --global i18n.commitencoding utf8
 $ git config --list
+git config --list
+core.quotepath=false
+i18n.logoutputencoding=utf8
+i18n.commitencoding=utf8
 
+$ exit
 $ sudo visudo
 $ sudo cat /etc/sudoers |grep gerrit
 [sudo] password for gerrit: 
-gerrit  ALL=(ALL)       ALL
+gerrit  ALL=(ALL)       NOPASSWD: ALL
 ```
 
 ## 安装 Gerrit
@@ -152,6 +157,7 @@ gerrit  ALL=(ALL)       ALL
 1)下载安装包并上传，[版本文件](https://gerrit-releases.storage.googleapis.com/index.html)请自行选择，2.x 与 3.x 安装过程并无差异
 
 ```bash
+$ su - gerrit
 $ sudo mkdir -p /usr/local/gerrit
 $ cd !$ && sudo wget https://gerrit-releases.storage.googleapis.com/gerrit-3.5.2.war
 ```
@@ -159,7 +165,8 @@ $ cd !$ && sudo wget https://gerrit-releases.storage.googleapis.com/gerrit-3.5.2
 2)执行命令安装并按自身环境选择配置
 
 ```bash
-$ sudo java -jar gerrit-3.5.2.war init -d review_site
+$ sudo chown -R gerrit. /usr/local/gerrit
+$ java -jar gerrit-3.5.2.war init -d review_site
 Using secure store: com.google.gerrit.server.securestore.DefaultSecureStore
 [2022-07-05 15:21:51,728] [main] INFO  com.google.gerrit.server.config.GerritServerConfigProvider : No /usr/local/gerrit/review_site/etc/gerrit.config; assuming defaults
 

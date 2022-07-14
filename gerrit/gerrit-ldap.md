@@ -93,7 +93,7 @@ Behind reverse proxy           [y/N]?
 Use SSL (https://)             [y/N]? 
 Listen on address              [*]: 
 Listen on port                 [8080]: 
-Canonical URL                  [http://m2-debug:8080/]: http://188.188.4.44
+Canonical URL                  [http://m2-debug:8080/]: http://188.188.4.44:8080/
 
 *** Cache
 *** 
@@ -152,6 +152,11 @@ Waiting for server on 188.188.4.44:80 ...
 
 $ chown -R gerrit. /usr/local/gerrit
 ```
+注：此处有个小知识点，第一位登录的默认会成为管理员，之后登录的都会是普通用户，请注意！
+
+![20220714105029.png](https://yuikuen-1259273046.cos.ap-guangzhou.myqcloud.com/devops/20220714105029.png)
+
+![20220714105129.png](https://yuikuen-1259273046.cos.ap-guangzhou.myqcloud.com/devops/20220714105129.png)
 
 ## 强制分组
 
