@@ -8,17 +8,16 @@
 
 ## Environment
 
-* [系统安装](environment/install.md)
 * [CentOS7.x内核升级](environment/kernel-update.md)
-* [初始操作](environment/init.md)
-* [安全加固](environment/safety.md)
 
 ## Gerrit
 
+* [Gerrit基本用法](gerrit/gerrit-basics.md)
 * [Gerrit源码安装3.5.x](gerrit/gerrit-source.md)
 * [Gerrit集成ldap登录](gerrit/gerrit-ldap.md)
 * [Gerrit安装配置GitWeb](gerrit/gerrit-gitweb.md)
-* [服务问题](gerrit/bug.md)
+* [Gerrit插件管理](gerrit/gerrit-plug.md)
+* [Gerrit集成GitLab](gerrit/gerrit-gitlab.md)
 
 ## Gitlab
 
@@ -31,11 +30,11 @@
 
 ## OpenLDAP
 
-* [服务简介](openldap/project.md)
-* [OpenLDAP(yum)安装2.4.x](openldap/openldap-yum.md)
+* [OpenLDAP(yum)单节点安装2.4.x](openldap/openldap-yum.md)
+* [OpenLDAP配置远程SSH登录](openldap/openldap-client.md)
+* [OpenLDAP配置公钥(PublicKey)远程登录客户机](openldap/openldap-publickey.md)
+* [OpenLDAP启用MemberOf属性](openldap/openldap-memberof.md)
 * [OpenLDAP创建用户&用户组](openldap/openldap-users.md)
-* [服务问题](openldap/bug.md)
-
 ## RabbitMQ
 
 * [RabbitMQ(rpm)安装3.8.x](rabbitmq/rabbitmq-rpm.md)
