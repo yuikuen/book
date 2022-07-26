@@ -1,6 +1,6 @@
 # Gerrit集成ldap登录
 
-> 之前已介绍过了 Gerrit 的基本安装，并且是采用 http 认证，本次采用的是 OpenLDAP 作用户认证
+> 之前已介绍过了 Gerrit 的基本安装，并且是采用 HTTP 认证的，但在用户创建时，并不便于管理和维护用户信息。为了用户的统一管理，下面演示以 OpenLDAP 认证登录。
 
 ## 前置环境
 
@@ -160,7 +160,7 @@ $ chown -R gerrit. /usr/local/gerrit
 
 ## 强制分组
 
-> Gerrit 接入 ldap 后，跟 Gitlab 一样，默认是全部用户都可访问登录，在此需求控制到组登录，但按照[官网教程](https://gerrit-review.googlesource.com/Documentation/config-gerrit.html#ldap)或其他教程都未成功，在此贴上配置文件，如有成功的朋友请 @mail 我一下呗。
+> Gerrit 接入 ldap 后，跟 Gitlab 一样，默认是全部用户都可访问登录，在此需求控制到组登录，但按照[官网教程](https://gerrit-review.googlesource.com/Documentation/config-gerrit.html#ldap)或其他教程都未成功，在此贴上配置文件，如有成功的朋友请 [@mail](228003666@qq.com) 我一下呗。
 
 ```bash
 [gerrit]

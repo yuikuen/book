@@ -1,10 +1,14 @@
-# OpenLDAP(yum)安装2.4.x
+# OpenLDAP(yum)单节点安装2.4.x
 
-**程序版本：**
+> 随着公司服务器的增多，服务账户管理成为了瓶颈，过多的普通用户和管理用户，给运维工作带来了极大的不便，在此着手把账户管理部署起来。
+
+## 前置环境
+
+**程序版本**
+
 - OpenLDAP：openldap-2.4.44-25.el7_9.x86_64
 - Phpldapadmin：phpldapadmin-1.2.5-1.el7.noarch
 
-## 前置环境
 1)演示环境，直接关闭 SELinux 和 Firewalld
 
 ```bash
@@ -12,81 +16,53 @@ $ sed -i '/SELINUX/s/enforcing/disabled/' /etc/selinux/config && setenforce 0
 $ systemctl disable --now firewalld.service 
 ```
 
-## 安装程序
-1)执行`yum`命令进行下载安装
+## 安装服务
+
+1)通过 yum 安装 OpenLDAP Server 服务
 
 ```bash
-$ yum -y install openldap compat-openldap openldap-clients openldap-servers openldap-servers-sql openldap-devel migrationtools
-
-# 查看版本
-$ slapd -VV
-@(#) $OpenLDAP: slapd 2.4.44 (Aug 31 2021 14:48:49) $
-        mockbuild@x86-02.bsys.centos.org:/builddir/build/BUILD/openldap-2.4.44/openldap-2.4.44/servers/slapd
+$ yum -y install openldap compat-openldap openldap-clients openldap-servers openldap-servers-sql openldap-devel
 ```
 
-2)生成管理员密码
+2)初始化配置，使用程序默认的模板建立数据库
 
 ```bash
-$ slappasswd -s Admin@123
-{SSHA}GJEm8DDGliPDM+/ip/lk5d+KDBGjR9TU
+$ cp /usr/share/openldap-servers/DB_CONFIG.example /var/lib/ldap/DB_CONFIG
+$ chown ldap:ldap -R /var/lib/ldap
+$ chmod 700 -R /var/lib/ldap
 ```
 
-3)修改配置文件，添加之前生成的密码
+注：`/var/lib/ldap` 为 BerkeleyDB 数据库默认存储的路径
 
-> *从 OpenLDAP-2.4.23 版本开始所有配置数据都保存在 `/etc/openldap/slapd.d/` 中，已无slapd.conf 作为配置文件使用了*
-
-```bash
-$ vim /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif
-# 修改成自己的域名，管理员dn账号
-olcSuffix: dc=yuikuen,dc=top
-olcRootDN: cn=Manager,dc=yuikuen,dc=top
-# 添加之前生成的密码
-olcRootPW: {SSHA}GJEm8DDGliPDM+/ip/lk5d+KDBGjR9TU
-```
-```bash
-$ vim /etc/openldap/slapd.d/cn=config/olcDatabase={1}monitor.ldif
-# 修改域名信息
-olcAccess: {0}to * by dn.base="gidNumber=0+uidNumber=0,cn=peercred,cn=extern
-al,cn=auth" read by dn.base="cn=Manager,dc=yuikuen,dc=top" read by * none
-```
-
-4)验证配置文件是否正确
-
-```bash
-$ slaptest -u
-62c25987 ldif_read_file: checksum error on "/etc/openldap/slapd.d/cn=config/olcDatabase={1}monitor.ldif"
-62c25987 ldif_read_file: checksum error on "/etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif"
-config file testing succeeded
-```
-注：如出现 `checksum error on`，可忽略错误继续操作
-
-5)启动服务并设置开机自启
+3)启动服务并确认安装是否成功
 
 ```bash
 $ systemctl enable --now slapd && systemctl status slapd
 $ netstat -anpl|grep 389
-tcp        0      0 0.0.0.0:389             0.0.0.0:*               LISTEN      5488/slapd          
-tcp6       0      0 :::389                  :::*                    LISTEN      5488/slapd
+tcp        0      0 0.0.0.0:389             0.0.0.0:*               LISTEN      1634/slapd          
+tcp6       0      0 :::389                  :::*                    LISTEN      1634/slapd 
 ```
 
-## 配置程序
+## 服务配置
 
-> 安装 openldap 后，会有三个命令用于修改配置文件，分别为 ldapadd，ldapmodify，ldapdelete，顾名思义就是添加，修改和删除。需要修改或增加配置时，则需要先写一个 ldif 后缀的配置文件，然后通过命令将写的配置更新到 slapd.d 目录下的配置文件中去
+> 上述操作只是基本的安装配置，用户、组织、设置等都是没有的，下面将进行基础配置及用户创建。
 
-1)配置数据库(OpenLDAP 默认使用的数据库是 BerkeleyDB)
+**这里有三个点需要注意的：**
+
+1. 从 OpenLDAP-2.4.23 版本开始所有配置数据都保存在 `/etc/openldap/slapd.d/` 中，已无 slapd.conf 作为配置文件使用了
+2. 安装 OpenLDAP 后，会有三个命令用于修改配置文件，分别为 `ldapadd`、`ldapmodify`、`ldapdelete`，顾名思义就是添加、修改和删除。需要修改或新增时，则需写一个 ldif 后缀的配置文件，然后通过命令将写的配置更新至 slapd.d 目录下的配置文件中
+3. 最重要的事项，ldif文件都是以空行作为用户分割，格式要保持一致！！请参考 base.ldif 文件，勿加注释或空格之类！！
+
+1)首先生成管理员的加密密码
 
 ```bash
-# 程序目录内有example模版，可直接复制使用
-$ cp /usr/share/openldap-servers/DB_CONFIG.example /var/lib/ldap/DB_CONFIG
-# 安装程序时会自动创建ldap用户，直接赋权
-$ chown ldap:ldap -R /var/lib/ldap
-$ chmod 700 -R /var/lib/ldap
+$ slappasswd -s Admin@123
+{SSHA}+IqqdRVpbUXCbre3dTrtGKt+zZKak9Ef
 ```
-注：`/var/lib/ldap` 为 BerkeleyDB 数据库默认存储的路径
 
-2)导入基本 `Schema` 文件
+2)导入 Schema 基本文件(可根据需要添加更多)
 
-> schema 控制着条目有哪些对象类和属性，可自行选择导入
+> Schema 类似数据库表，定义了字段名和类型等参数值
 
 ```bash
 $ ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/cosine.ldif
@@ -103,34 +79,132 @@ $ ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/pmi.ldif
 $ ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/ppolicy.ldif
 ```
 
-3)修改 `migrate_common.ph` 文件，此文件主要用于生成 `ldif` 文件
+3)修改域名信息(前面已说明过了，官方不推荐直接修改配置文件，建议通过 `ldapmodify` 来更新配置)
 
 ```bash
-$ vim /usr/share/migrationtools/migrate_common.ph +71
-# 修改域名信息
-$DEFAULT_MAIL_DOMAIN = "yuikuen.top";
-$DEFAULT_BASE = "dc=yuikuen,dc=top";
-$EXTENDED_SCHEMA = 1;
+$ mkdir -p /etc/openldap/myldif
+$ vim ./myldif/changedomain.ldif
+dn: olcDatabase={1}monitor,cn=config
+changetype: modify
+replace: olcAccess
+olcAccess: {0}to * by dn.base="gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth" read by dn.base="cn=Manager,dc=yuikuen,dc=top" read by * none
+
+dn: olcDatabase={2}hdb,cn=config
+changetype: modify
+replace: olcSuffix
+olcSuffix: dc=yuikuen,dc=top
+
+dn: olcDatabase={2}hdb,cn=config
+changetype: modify
+replace: olcRootDN
+olcRootDN: cn=Manager,dc=yuikuen,dc=top
+
+dn: olcDatabase={2}hdb,cn=config
+changetype: modify
+replace: olcRootPW
+olcRootPW: {SSHA}+IqqdRVpbUXCbre3dTrtGKt+zZKak9Ef
+
+dn: olcDatabase={2}hdb,cn=config
+changetype: modify
+add: olcAccess
+olcAccess: {0}to attrs=userPassword,shadowLastChange by dn="cn=Manager,dc=yuikuen,dc=top" write by anonymous auth by self write by * none
+olcAccess: {1}to dn.base="" by * read
+olcAccess: {2}to * by dn="cn=Manager,dc=yuikuen,dc=top" write by * read
 ```
 
-4)重启服务以保证配置文件生效
+**配置文件解释**
+
+- 注意 ldif 文件都是以行作为用户分割，格式要保持一致
+- 第一行：执行配置文件，到 `/etc/openldap/slapd.d/` 目录，找到指定 `cn=config/olcDatabase={0}config` 文件
+- 第二行：changetype 指定类型为修改
+- 第三行：add/replace 表示增加/替换的配置项
+- 第四行：指定配置项的值
+
+注：执行命令前，可以查看原来 `olcDatabase={0}config` 文件，里面是没 olcRootPW 配置项，执行后可以看到已新增刚指定的值
+
+*另配置方法同理，直接修改配置文件*
 
 ```bash
-$ systemctl restart slapd
+$ vim /etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif
+# 修改成自己的域名，管理员dn账号
+olcSuffix: dc=yuikuen,dc=top
+olcRootDN: cn=Manager,dc=yuikuen,dc=top
+# 添加之前生成的密码
+{SSHA}qDu/xSUWVnlMxDc/+EPJT0GB/x93p5Lk
+
+$ vim /etc/openldap/slapd.d/cn=config/olcDatabase={1}monitor.ldif
+# 修改域名信息
+olcAccess: {0}to * by dn.base="gidNumber=0+uidNumber=0,cn=peercred,cn=extern
+al,cn=auth" read by dn.base="cn=Manager,dc=yuikuen,dc=top" read by * none
+```
+
+4)执行命令进行修改
+
+```bash
+$ ldapmodify -Y EXTERNAL -H ldapi:/// -f changedomain.ldif
+SASL/EXTERNAL authentication started
+SASL username: gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth
+SASL SSF: 0
+modifying entry "olcDatabase={1}monitor,cn=config"
+
+modifying entry "olcDatabase={2}hdb,cn=config"
+
+modifying entry "olcDatabase={2}hdb,cn=config"
+
+modifying entry "olcDatabase={2}hdb,cn=config"
+
+modifying entry "olcDatabase={2}hdb,cn=config"
+```
+
+## 开启日志
+
+> LDAP 默认是没有开启日志功能的，需要单独配置
+
+1)配置 ldap_log
+
+```bash
+$ touch ./myldif/ldap_log.ldif; vim ldap_log.ldif
+dn: cn=config
+changetype: modify
+replace: olcLogLevel
+olcLogLevel: stats
+```
+
+2)执行 `ldapmodify` 命令发送参数到 LDAP 进行配置
+
+```bash
+$ ldapmodify -Y EXTERNAL -H ldapi:/// -f ldap_log.ldif
+```
+
+3)使用系统自带的 `rsyslog` 进行日志输出
+
+```bash
+$ vim /etc/rsyslog.conf
+...
+local4.*               /var/log/openldap.log
+
+$ vim /etc/logrotate.d/slapd
+/var/log/openldap.log {
+    rotate 14
+    size 10M
+    missingok
+    compress
+    copytruncate
+}
+
+$ systemctl restart rsyslog
 ```
 
 ## 创建组织
 
-> 上面其实已经安装好 OpenLDAP 了，但里面什么都没有，现需要在此基础上，创建一个组织(公司 company)
-> 以 `yuikuen.top` 为域名，并在其下创建 `Manager` 的组织角色(此用户为管理员，具有整个LDAP的权限)
-> 之后再创建两个组织单元 `People/Group`，注意此处的组织单元并不是部门的意思。
+> 通过上述操作后，OpenLDAP 的基础功能已实现了，但里面什么都没有。而现在就需要在此创建基础架构，创建一个组织(公司 Company)，以 `yuikuen.top` 域名，并在其下创建名为 `Manager` 的组织角色(管理员，具有整个 LDAP 的权限)，之后再创建两个组织单元 `People/Group`
+>
+> 注意：此处的组织单元并不是部门的意思，只是用户/部门组的集合单元
 
-1)创建一个组织
+1)创建一个 ldif 文件，定义组织信息
 
 ```bash
-$ mkdir -p /etc/openldap/myldif
 $ vim ./myldif/base.ldif
-# 此处有坑！！注意ldif文件都是以空行作为用户分割，格式要保持一致！！
 dn: dc=yuikuen,dc=top
 o: yuikuen top
 dc: yuikuen
@@ -141,7 +215,7 @@ objectclass: organization
 dn: cn=Manager,dc=yuikuen,dc=top
 cn: Manager
 objectClass: organizationalRole
-description: Directory Manager
+description: LDAP Manager
 
 dn: ou=People,dc=yuikuen,dc=top
 ou: People
@@ -152,69 +226,25 @@ dn: ou=Group,dc=yuikuen,dc=top
 ou: Group
 objectClass: top
 objectClass: organizationalUnit
-
-# 此处为ACL控制，仅Manager可修改密码，不允许匿名访问(可略过，自行选择)
-dn: olcDatabase={2}hdb,cn=config
-changetype: modify
-add: olcAccess
-olcAccess: {0}to attrs=userPassword,shadowLastChange by dn="cn=Manager,dc=yuikuen,dc=top" write by anonymous auth by self write by * none
-olcAccess: {1}to dn.base="" by * read
-olcAccess: {2}to * by dn="cn=Manager,dc=yuikuen,dc=top" write by * read
 ```
 
-2)执行 `ldapadd` 命令创建组织
+2)执行命令创建组织
 
 ```bash
-$ ldapadd -x -w "Admin@123" -D "cn=Manager,dc=yuikuen,dc=top" -f /etc/openldap/myldif/base.ldif
-# 注：此处必须有输出如下adding信息才算创建成功
+$ ldapadd -x -w "Admin@123" -D "cn=Manager,dc=yuikuen,dc=top" -f base.ldif
 adding new entry "dc=yuikuen,dc=top"
+
 adding new entry "cn=Manager,dc=yuikuen,dc=top"
+
 adding new entry "ou=People,dc=yuikuen,dc=top"
+
 adding new entry "ou=Group,dc=yuikuen,dc=top"
 ```
 
-3)添加组织架构
-
-> 刚也说过 `People/Group` 并不是部门，只是组织单元。而现创建的才是部门或组
-> 现以IT部门为例，创建各组别 op运维、rd开发、pm项目、qa测试
+3)使用 `ldapsearch` 来检查内容
 
 ```bash
-$ vim ./myldif/group.ldif
-# 此处有坑！！注意ldif文件都是以空行作为用户分割，格式要保持一致！！
-dn: ou=op,ou=People,dc=yuikuen,dc=top
-changetype: add
-objectClass: organizationalUnit
-ou: op
-
-dn: ou=rd,ou=People,dc=yuikuen,dc=top
-changetype: add
-objectClass: organizationalUnit
-ou: rd
-
-dn: ou=pm,ou=People,dc=yuikuen,dc=top
-changetype: add
-objectClass: organizationalUnit
-ou: pm
-
-dn: ou=qa,ou=People,dc=yuikuen,dc=top
-changetype: add
-objectClass: organizationalUnit
-ou: qa
-```
-
-4)执行创建命令并检查配置是否正确
-
-```bash
-$ ldapadd -x -w "Admin@123" -D "cn=Manager,dc=yuikuen,dc=top" -f /etc/openldap/myldif/group.ldif
-# 注：此处必须有输出如下adding信息才算成功创建
-adding new entry "ou=op,ou=People,dc=yuikuen,dc=top"
-adding new entry "ou=rd,ou=People,dc=yuikuen,dc=top"
-adding new entry "ou=pm,ou=People,dc=yuikuen,dc=top"
-adding new entry "ou=qa,ou=People,dc=yuikuen,dc=top"
-```
-检查输出的配置内容，必须要有 `Success` 信息才算成功
-```bash
-$ ldapsearch -x -D cn=Manager,dc=yuikuen,dc=top -w Admin@123 -b "dc=yuikuen,dc=top"
+$ ldapsearch -x -D "cn=Manager,dc=yuikuen,dc=top" -w "Admin@123" -b "dc=yuikuen,dc=top"
 # extended LDIF
 #
 # LDAPv3
@@ -235,7 +265,7 @@ objectClass: organization
 dn: cn=Manager,dc=yuikuen,dc=top
 cn: Manager
 objectClass: organizationalRole
-description: Directory Manager
+description: LDAP Manager
 
 # People, yuikuen.top
 dn: ou=People,dc=yuikuen,dc=top
@@ -249,46 +279,163 @@ ou: Group
 objectClass: top
 objectClass: organizationalUnit
 
-# op, People, yuikuen.top
-dn: ou=op,ou=People,dc=yuikuen,dc=top
-objectClass: organizationalUnit
-ou: op
+# search result
+search: 2
+result: 0 Success
 
-# rd, People, yuikuen.top
+# numResponses: 5
+# numEntries: 4
+```
+
+## 创建用户
+
+> ou 并不能当做分组，而仅仅是组织架构的一个单元，ldap 的分组都是通过单独的 Group 来实现的
+
+1)首先生成一个加密的密码(可后面自行修改)
+
+```bash
+$ slappasswd -h {sha} -s 123456
+{SHA}fEqNCco3Yq9h5ZUglD3CZJT4lBs=
+```
+
+2)创建 ldif 文件，定义用户&用户组参数值
+
+> 以 IT 部门为例：开发、运维、项目等级别创建，并创建一位开发同事
+
+```bash
+$ vim ./myldif/user.ldif
+# 创建三个用户集合rd/op/pm
 dn: ou=rd,ou=People,dc=yuikuen,dc=top
+changetype: add
 objectClass: organizationalUnit
 ou: rd
 
-# pm, People, yuikuen.top
+dn: ou=op,ou=People,dc=yuikuen,dc=top
+changetype: add
+objectClass: organizationalUnit
+ou: op
+
 dn: ou=pm,ou=People,dc=yuikuen,dc=top
+changetype: add
 objectClass: organizationalUnit
 ou: pm
 
-# qa, People, yuikuen.top
-dn: ou=qa,ou=People,dc=yuikuen,dc=top
-objectClass: organizationalUnit
-ou: qa
+# 创建一个rd组的用户rd001，并定义相关个人信息
+dn: uid=rd001,ou=rd,ou=People,dc=yuikuen,dc=top
+cn: rd001
+uid: rd001
+sn: rd001
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+userPassword: {SHA}fEqNCco3Yq9h5ZUglD3CZJT4lBs=
+displayName: 小王
+title: Java_Engineer
+mail: rd001@yuikuen.top
+shadowMin: 0
+ShadowMax: 99999
+shadowWarning: 7
+loginShell: /bin/bash
+gecos: Demo [Demo user example]
+uidNumber: 10001
+gidNumber: 10001
+homeDirectory: /home/rd001
+
+# 创建一个部门组back-end，将uid=rd001的用户进行关联
+dn: cn=back-end,ou=Group,dc=yuikuen,dc=top
+objectClass: posixGroup
+objectClass: top
+cn: back-end
+gidNumber: 100000
+memberUid: uid=rd001,ou=rd,ou=People,dc=yuikuen,dc=top
+```
+
+3)执行命令进行创建
+
+```bash
+$ ldapadd -x -w "Admin@123" -D "cn=Manager,dc=yuikuen,dc=top" -f user.ldif 
+adding new entry "ou=rd,ou=People,dc=yuikuen,dc=top"
+
+adding new entry "ou=op,ou=People,dc=yuikuen,dc=top"
+
+adding new entry "ou=pm,ou=People,dc=yuikuen,dc=top"
+
+adding new entry "uid=rd001,ou=rd,ou=People,dc=yuikuen,dc=top"
+
+adding new entry "cn=back-end,ou=Group,dc=yuikuen,dc=top"
+```
+
+4)指定唯一 id 来查询某个用户，比如 cn 唯一
+
+```bash
+# 示例：ldapsearch -x -w "admin_passwd" -D "admin_dn" -b "base_dn" "search_filter"
+$ ldapsearch -x -w "Admin@123" -D "cn=Manager,dc=yuikuen,dc=top" -b "dc=yuikuen,dc=top" "cn=rd001"
+# extended LDIF
+#
+# LDAPv3
+# base <dc=yuikuen,dc=top> with scope subtree
+# filter: cn=rd001
+# requesting: ALL
+#
+
+# rd001, rd, People, yuikuen.top
+dn: uid=rd001,ou=rd,ou=People,dc=yuikuen,dc=top
+cn: rd001
+uid: rd001
+sn: rd001
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+userPassword:: e1NIQX1mRXFOQ2NvM1lxOWg1WlVnbEQzQ1pKVDRsQnM9
+displayName:: 5bCP546L
+title: Java_Engineer
+mail: rd001@yuikuen.top
+shadowMin: 0
+shadowMax: 99999
+shadowWarning: 7
+loginShell: /bin/bash
+gecos: Demo [Demo user example]
+uidNumber: 10001
+gidNumber: 10001
+homeDirectory: /home/rd001
 
 # search result
 search: 2
 result: 0 Success
 
-# numResponses: 9
-# numEntries: 8
+# numResponses: 2
+# numEntries: 1
 ```
-**参数说明：**
-- -X：启动认证
-- -D：bind admin 的 dn
-- -w：admin 的密码
-- -b：basedn，查询的基础 dn
 
-## 安装终端
+5)执行 `ldapdelete` 删除指定用户，再次查询已提示没有此用户
 
-> 此处为什么要安装终端(PhpLDAPAdmin)？其实经过以上安装及配置，OpenLDAP 已经可以使用了。
-> 只是现服务下默认没有普通用户，只有刚创建好的管理员用户和基础组织架构。而 `PhpLDAPadmin` 只是个图形管理工具，
-> 因为 LDAP 的命令行管理方式对一般人来说并不是很友好，为了更好的演示用户和组的创建过程，在此使用 `PhpLDAPAdmin` 图形管理工具来进行，也可使用 `LDAP admin`。
+```bash
+$ ldapdelete -w "Admin@123" -D "cn=Manager,dc=yuikuen,dc=top" -x "uid=rd001,ou=rd,ou=People,dc=yuikuen,dc=top"
+$ ldapsearch -x -w "Admin@123" -D "cn=Manager,dc=yuikuen,dc=top" -b "dc=yuikuen,dc=top" "cn=rd001"
+# extended LDIF
+#
+# LDAPv3
+# base <dc=yuikuen,dc=top> with scope subtree
+# filter: cn=rd001
+# requesting: ALL
+#
 
-1)安装依赖包，并下载安装 phpldapadmin
+# search result
+search: 2
+result: 0 Success
+
+# numResponses: 1
+```
+
+## 管理工具
+
+> 此处为什么要安装管理工具？其实经过以上安装及配置，OpenLDAP 已经可以使用了。 但 LDAP 的命令行管理方式对一般人来说并不是很友好，为了更方便管理用户和组的创建，可以使用 `PhpLDAPAdmin` 或 `LDAP Admin` 图形管理工具来进行管理
+
+### PhpLDAPAdmin
+
+> 基于 Web 的 OpenLDAP 管理工具，通过代理实现
+
+1)安装依赖包、服务组件，并下载 phpldapadmin
 
 ```bash
 $ yum -y install httpd php php-ldap php-gd php-mbstring php-pear php-bcmath php-xml
@@ -296,7 +443,7 @@ $ yum -y install epel-release
 $ yum --enablerepo=epel -y install phpldapadmin
 ```
 
-2)修改配置文件，放开外网访问权限
+2)修改配置文件，开放外网访问权限
 
 ```bash
 $ vim /etc/httpd/conf.d/phpldapadmin.conf
@@ -319,7 +466,7 @@ Alias /ldapadmin /usr/share/phpldapadmin/htdocs
 </Directory>
 ```
 
-3)修改 uid 登录方式和关闭匿名登录、用户属性的唯一性等（非必须）
+3)修改 uid 登录方式和关闭匿名登录、用户属性的唯一性等
 
 ```bash
 $ vim /etc/phpldapadmin/config.php +398
@@ -340,258 +487,29 @@ $servers->setValue('unique','attrs',array('mail','uid','uidNumber','cn','sn'))
 $ systemctl enable --now httpd && systemctl status httpd
 ```
 
-## 添加用户
+5)配置完成，打开浏览器登录  http://ldap-server/phpldapadmin 
 
-> 配置完成后，可登录 http://ldap-server/phpldapadmin 查看
-> 账密：`cn=Manager,dc=yuikuen,dc=top` / `Admin@123`
+- 账号：`cn=Manager,dc=yuikuen,dc=top`
+- 密码：`Admin@123`
 
-简要回顾：上述的操作是，设置一个 LDAP 目录树，其基准 `dc=yuikuen,dc=top` 是该树的根节点，
-创建一个管理域为 `cn=Manager,dc=yuikuen,dc=top`，和两个组织单元 `ou=People,dc=yuikuen,dc=top` 及 
-`ou=Group,dc=yuikuen,dc=top`，而 People 下拥有多个子属性(部门组 rd/op/pm/qa)
+![image-20220721161200623](https://yuikuen-1259273046.cos.ap-guangzhou.myqcloud.com/devops/image-20220721161200623.png)
 
-![image-20220704113600171](https://yuikuen-1259273046.cos.ap-guangzhou.myqcloud.com/devops/image-20220704113600171.png)
+### LDAP Admin
 
-如图所示，默认只有创建的管理员、组织和组织架构，而下面就开始创建所需的用户
+> Windows 下的 OpenLDAP 管理工具，直接解压打开 exe 文件即可使用
 
-1)首先第一步，创建用户，使用 sha1 存储密码，通过 userPassword 保存
+1)到 [LDAP Admin官网](http://www.ldapadmin.org/index.html)，找到 [Download](https://sourceforge.net/projects/ldapadmin/files/ldapadmin/1.8.3/) 下载（当前最新版本是 1.8.3）
 
-```bash
-$ slappasswd -h {sha} -s 123456
-{SHA}fEqNCco3Yq9h5ZUglD3CZJT4lBs=
-```
+![image-20220721161548513](https://yuikuen-1259273046.cos.ap-guangzhou.myqcloud.com/devops/image-20220721161548513.png)
 
-2)创建新用户的 ldif 文件
+![image-20220721161705076](https://yuikuen-1259273046.cos.ap-guangzhou.myqcloud.com/devops/image-20220721161705076.png)
 
-```bash
-# 再次提醒！ldif文件以空行作用用户分割，格式要保持一致！
-dn: cn=rd001,ou=rd,ou=People,dc=yuikuen,dc=top
-changetype: add
-objectClass: inetOrgPerson
-cn: rd001
-userPassword: {SHA}fEqNCco3Yq9h5ZUglD3CZJT4lBs=
-sn: rd001
-title: Java_Engineer
-mail: rd001@yuikuen.top
-uid: rd001
-displayName: 张三
+## 参考链接
 
-dn: cn=op001,ou=op,ou=People,dc=yuikuen,dc=top
-changetype: add
-objectClass: inetOrgPerson
-cn: op001
-userPassword: {SHA}fEqNCco3Yq9h5ZUglD3CZJT4lBs=
-sn: op001
-title: System_Engineer
-mail: op001@yuikuen.top
-uid: op001
-displayName: 李四
-
-dn: cn=pm001,ou=pm,ou=People,dc=yuikuen,dc=top
-changetype: add
-objectClass: inetOrgPerson
-cn: pm001
-userPassword: {SHA}fEqNCco3Yq9h5ZUglD3CZJT4lBs=
-sn: pm001
-title: Project_Engineer
-mail: pm001@yuikuen.top
-uid: pm001
-displayName: 王五
-
-dn: cn=qa001,ou=qa,ou=People,dc=yuikuen,dc=top
-changetype: add
-objectClass: inetOrgPerson
-cn: qa001
-userPassword: {SHA}fEqNCco3Yq9h5ZUglD3CZJT4lBs=
-sn: qa001
-title: Test_Engineer
-mail: qa001@yuikuen.top
-uid: qa001
-displayName: 赵六
-```
-
-3)执行创建命令并查询其中一个用户测试是否成功
-
-```bash
-$ ldapadd -x -w "Admin@123" -D "cn=Manager,dc=yuikuen,dc=top" -f /etc/openldap/myldif/user.ldif
-# 跟之前创建命令一样，要有正常输出adding信息才为成功
-adding new entry "cn=rd001,ou=rd,ou=People,dc=yuikuen,dc=top"
-adding new entry "cn=op001,ou=op,ou=People,dc=yuikuen,dc=top"
-adding new entry "cn=pm001,ou=pm,ou=People,dc=yuikuen,dc=top"
-adding new entry "cn=qa001,ou=qa,ou=People,dc=yuikuen,dc=top"
-
-# 以cn=rd001为例进行验证
-$ ldapsearch -x -D cn=Manager,dc=yuikuen,dc=top -w Admin@123 -b "dc=yuikuen,dc=top" "cn=rd001"
-# extended LDIF
-#
-# LDAPv3
-# base <dc=yuikuen,dc=top> with scope subtree
-# filter: cn=rd001
-# requesting: ALL
-#
-
-# rd001, rd, People, yuikuen.top
-dn: cn=rd001,ou=rd,ou=People,dc=yuikuen,dc=top
-objectClass: inetOrgPerson
-cn: rd001
-userPassword:: e1NIQX1mRXFOQ2NvM1lxOWg1WlVnbEQzQ1pKVDRsQnM9
-sn: rd001
-title: Java_Engineer
-mail: rd001@yuikuen.top
-uid: rd001
-displayName:: 5byg5LiJ
-
-# search result
-search: 2
-result: 0 Success
-
-# numResponses: 2
-# numEntries: 1
-```
-注：在配置第三方认证的时候，就是通过 userfilter 来 search 用户的，在 PhpLDAPAdmin 上点击刷新，就可以查看到已创建成功的用户
-
-![image-20220704114009136](https://yuikuen-1259273046.cos.ap-guangzhou.myqcloud.com/devops/image-20220704114009136.png)
-
-**小知识：**常用命令行操作指令
-- 删除用户 & 删除组织
-
-```bash
-$ ldapdelete -x -D "cn=Manager,dc=yuikuen,dc=top" -w Admin@123 "uid=rd001,ou=People,dc=yuikuen,dc=top"
-$ ldapdelete -x -D "cn=Manager,dc=yuikuen,dc=top" -w Admin@123 "ou=People,dc=yuikuen,dc=top"
-```
-
-- 管理员修改用户密码
-
-```bash
-$ vim changepwd.ldif
-dn: cn=rd001,ou=rd,ou=People,dc=yuikuen,dc=top
-changetype: modify
-# add是增加属性，而replace是修改已存在属性
-replace: userPassword
-userPassword: substring
-
-# ldapmodify是用来修改密码的，执行命令
-$ ldapmodify -a -H ldap://188.188.4.140:389 -D "cn=Manager,dc=yuikuen,dc=top" -w Admin@123 -f changepwd.ldif
-
-# 默认没权限修改密码，在已知密码下修改密码
-$ ldappasswd -h 188.188.4.140 -p 389 -x -D "cn=rd001,ou=rd，ou=People,dc=yuikuen,dc=top" -w substring -a old_passwd -S
-```
-
-## 添加模块
-
-> OpenLDAP 加载 memberof 模块后，可通过 groupOfNames 和 memberOf 实现分组认证的功能，
-> 在 Gitlab&Jenkins 等系统上都能作为过滤组用户来使用，为此在创建部门组前进行添加。
-
-1)创建 `module_group.sh`
-
-```bash
-$ vim module_group.sh
-dn: cn=module,cn=config
-cn: module
-objectClass: olcModuleList
-olcModulePath: /usr/lib64/openldap
-
-dn: cn=module{0},cn=config
-changetype: modify
-add: olcModuleLoad
-olcModuleLoad: memberof.la
-
-$ ldapadd -Q -Y EXTERNAL -H ldapi:/// -f module_group.sh 
-adding new entry "cn=module,cn=config"
-
-modifying entry "cn=module{0},cn=config"
-```
-
-2)创建 `group_objectClass.sh`
-
-```bash
-$ vim group_objectClass.sh
-dn: olcOverlay=memberof,olcDatabase={2}hdb,cn=config
-objectClass: olcConfig
-objectClass: olcMemberOf
-objectClass: olcOverlayConfig
-objectClass: top
-olcOverlay: memberof
-olcMemberOfDangling: ignore
-olcMemberOfRefInt: TRUE
-olcMemberOfGroupOC: groupOfNames
-olcMemberOfMemberAD: member     
-olcMemberOfMemberOfAD: memberOf
-
-$ ldapadd -Q -Y EXTERNAL -H ldapi:/// -f group_objectClass.sh
-adding new entry "olcOverlay=memberof,olcDatabase={2}hdb,cn=config"
-```
-
-## 添加用户组
-
-> ou 并不能当做分组，只是组织架构的一个单元，ldap 的分组都是通过单独的 group 来实现的，分组类型如下：
-> - groupOfNames：适用大多数用途，本次演示类型
-> - posixGroup：代表传统 unix 组，由 gidNUmber 和列表 memberUid 标识
-> 注：OpenLDAP 用户和用户组之间默认是没有任何关联的，需要将新建或原用户，添加到指定用户组的 ldif 文件内
-
-1)在 Group 单元组织下添加分组，并将用户绑定
-
-```bash
-$ vim addgroup.ldif
-# 简要说明：将cn=rd001的用户，绑定group下新创建cn=rd的组下
-dn: cn=rd,ou=Group,dc=yuikuen,dc=top
-objectClass: groupOfNames
-cn: rd
-member: cn=rd001,ou=rd,ou=People,dc=yuikuen,dc=top
-
-dn: cn=op,ou=Group,dc=yuikuen,dc=top
-objectClass: groupOfNames
-cn: op
-member: cn=op001,ou=op,ou=People,dc=yuikuen,dc=top
-
-dn: cn=pm,ou=Group,dc=yuikuen,dc=top
-objectClass: groupOfNames
-cn: pm
-member: cn=pm001,ou=pm,ou=People,dc=yuikuen,dc=top
-
-dn: cn=qa,ou=Group,dc=yuikuen,dc=top
-objectClass: groupOfNames
-cn: qa
-member: cn=qa001,ou=qa,ou=People,dc=yuikuen,dc=top
-```
-
-2)执行命令进行创建绑定
-
-```bash
-$ ldapmodify -a -H ldap://188.188.4.140:389 -D "cn=Manager,dc=yuikuen,dc=top" -w Admin@123 -f addgroup.ldif
-adding new entry "cn=rd,ou=Group,dc=yuikuen,dc=top"
-adding new entry "cn=op,ou=Group,dc=yuikuen,dc=top"
-adding new entry "cn=pm,ou=Group,dc=yuikuen,dc=top"
-adding new entry "cn=qa,ou=Group,dc=yuikuen,dc=top"
-```
-此时可看到之前创建的用户，如 `cn=rd001` 已经添加到 `cn=rd,ou=Group,dc=yuikuen,dc=top` 的 member 属性中
-
-![image-20220704114738101](https://yuikuen-1259273046.cos.ap-guangzhou.myqcloud.com/devops/image-20220704114738101.png)
-
-3)添加其他用户至指定组中（现李四需接手测试的工作，将 op001 添加到 cn=qa）
-
-```bash
-$ vim newaddgroup.ldif
-dn: cn=qa,ou=Group,dc=yuikuen,dc=top
-changetype: modify
-add: member
-member: cn=op001,ou=qa,ou=People,dc=yuikuen,dc=top
-
-$ ldapmodify -a -H ldap://188.188.4.44:389 -D "cn=Manager,dc=yuikuen,dc=top" -w Admin@123 -f newaddgroup.ldif
-```
-
-4)从 group 下移除 user（现赵六离职，需从组内移除此人）
-
-```bash
-$ vim removeuser.sh
-dn: cn=qa,ou=Group,dc=yuikuen,dc=top
-changetype: modify
-delete: member
-member: cn=qa001,ou=qa,ou=People,dc=yuikuen,dc=top
-
-$ ldapmodify -H ldap:/// -x -D cn=Manager,dc=yuikuen,dc=top -w Admin@123 -f removeuser.sh
-```
-注：通过以上操作，基本实现了 LDAP 用户&用户组管理
-
-**参考链接：**
+- [官方文档](https://www.openldap.org/doc/admin24/guide.html)
+- [详细的ldap介绍](https://www.cnblogs.com/kevingrace/p/5773974.html)
+- [详细的ldap安装介绍](https://www.cnblogs.com/kevingrace/p/9052669.html)
+- [memberOf模块介绍](https://www.jianshu.com/p/c877b317f294)
 - [运维干货: OpenLDAP搭建和使用 (qq.com)](https://mp.weixin.qq.com/s/zQVunrm9-oQWMnCeMxs9MQ)
 - [Openldap安装部署 - 牧梦者 - 博客园 (cnblogs.com)](https://www.cnblogs.com/swordfall/p/12119010.html#auto_id_9)
+- [CentOS7 配置OpenLDAP（一） 配置OpenLDAP服务单节点模式并实现服务器登录管理常见场景](https://blog.csdn.net/oyym_mv/article/details/94404663)

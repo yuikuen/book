@@ -136,13 +136,12 @@ $ git config --global core.quotepath false
 $ git config --global i18n.logoutputencoding utf8
 $ git config --global i18n.commitencoding utf8
 $ git config --list
-git config --list
 core.quotepath=false
 i18n.logoutputencoding=utf8
 i18n.commitencoding=utf8
 
 $ exit
-$ sudo visudo
+$ visudo
 $ sudo cat /etc/sudoers |grep gerrit
 [sudo] password for gerrit: 
 gerrit  ALL=(ALL)       NOPASSWD: ALL
@@ -342,7 +341,6 @@ $ ./gerrit/review_site/bin/gerrit.sh status
 
 ```bash
 $ sudo chmod 755 -R /usr/local/gerrit
-$ sudo chown -R gerrit. /usr/local/gerrit
 
 # 创建systemd服务文件
 $ sudo vim /etc/systemd/system/gerrit.service
