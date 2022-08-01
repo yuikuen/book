@@ -4,51 +4,29 @@
 
 ## Basics
 
-* [基础知识](basics/theory.md)
+* [Kerel_Update](Basics/kernel_update.md)
+* [System_Style](Basics/system_style.md)
 
-## Environment
+## DNS
 
-* [CentOS7.x内核升级](environment/kernel-update.md)
+* [DNS_Install](DNS/dns_install.md)
 
 ## Gerrit
 
-* [Gerrit基本用法](gerrit/gerrit-basics.md)
-* [Gerrit源码安装3.5.x](gerrit/gerrit-source.md)
-* [Gerrit集成ldap登录](gerrit/gerrit-ldap.md)
-* [Gerrit安装配置GitWeb](gerrit/gerrit-gitweb.md)
-* [Gerrit插件管理](gerrit/gerrit-plug.md)
-* [Gerrit集成GitLab](gerrit/gerrit-gitlab.md)
+* [Gerrit_Install](Gerrit/gerrit_install.md)
 
 ## Gitlab
 
-* [Gitlab(rpm)安装14.1.x](gitlab/gitlab-rpm.md)
-* [Gitlab集成ldap登录](gitlab/gitlab-ldap.md)
-
-## Mysql
-
-* [MySQL源码安装5.7.x](mysql/mysql-source.md)
+* [GitLab_Install](GitLab/gitlab_install.md)
+* [GitLab_LDAP](GitLab/gitlab_ldap.md)
 
 ## OpenLDAP
 
-* [OpenLDAP 简介](openldap/OpenLDAP.md)
-* [OpenLDAP(yum)单节点安装2.4.x](openldap/openldap-yum.md)
-* [OpenLDAP配置远程SSH登录](openldap/openldap-client.md)
-* [OpenLDAP配置密钥远程登录客户机](openldap/openldap-publickey.md)
-* [OpenLDAP启用MemberOf属性](openldap/openldap-memberof.md)
-* [OpenLDAP创建用户&用户组](openldap/openldap-users.md)
-* [OpenLDAP配置sudo权限管理](openldap/openldap-sudo.md)
-## RabbitMQ
-
-* [RabbitMQ(rpm)安装3.8.x](rabbitmq/rabbitmq-rpm.md)
-* [RabbitMQ源码安装3.9.x](rabbitmq/rabbitmq-source.md)
-## Redis
-
-* [Redis源码安装6.x](redis/redis-source.md)
-* [Redis异常问题处理集](redis/redis-bug.md)
-
-## Shell
-
-* [CentOS7.x内核升级脚本](shell/auto-kernel_update.md)
-* [Reids一键安装指定release脚本](shell/auto-redis_install.md)
-* [CentOS初始化操作脚本](shell/auto-system_init.md)
-* [Linux系统基本参数巡检脚本](shell/auto-system_patrol.md)
+* [OpenLDAP_Intro](OpenLDAP/openldap_intro.md)
+* [OpenLDAP_Install](OpenLDAP/openldap_install.md)
+* [OpenLDAP_WebUi](OpenLDAP/openldap_webui.md)
+* [OpenLDAP_User](OpenLDAP/openldap_user.md)
+* [OpenLDAP_MemberOf](OpenLDAP/openldap_memberof.md)
+* [OpenLDAP_Client](OpenLDAP/openldap_client.md)
+* [OpenLDAP_PublicKey](OpenLDAP/openldap_publickey.md)
+* [OpenLDAP_Sudo](OpenLDAP/openldap_sudo.md)
