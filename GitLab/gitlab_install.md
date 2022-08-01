@@ -1,52 +1,38 @@
-# Gitlab(rpm)安装14.1.x
+# GitLab Install(rpm)
 
-## 前置环境
+> Linux 快速安装，通过 rpm 源进行在线或离线安装
 
-1)开放对应服务协议，或直接禁用防火墙
+## 版本环境
+
+- System：CentOS7.9.2009 Minimal
+- GitLab：gitlab-ce-14.1.0
+
+1）开放服务协议或直接禁用安全配置
 
 ```bash
-$ sed -i '/SELINUX/s/enforcing/disabled/' /etc/selinux/config && setenforce 0 
-$ systemctl disable --now firewalld.service
-
 $ firewall-cmd --add-service=ssh --permanent
 $ firewall-cmd --add-service=http --permanent
 $ firewalld-cmd --reload
+
+$ sed -i '/SELINUX/s/enforcing/disabled/' /etc/selinux/config && setenforce 0 
+$ systemctl disable --now firewalld.service
 ```
 
-2)配置依赖环境
+2）下载依赖组件
 
 ```bash
 $ yum install policycoreutils openssh-server openssh-clients postfix
 $ systemctl enable --now sshd postfix
 ```
 
-## 目录说明
+## 程序安装
 
-GitLab由主要由以下服务构成，他们共同承担了Gitlab的运作需要：
-- nginx: 静态web服务器
-- gitlab-shell: 用于处理Git命令和修改authorized keys列表
-- gitlab-workhorse: 轻量级的反向代理服务器
-- logrotate：日志文件管理工具
-- postgresql：数据库
-- redis：缓存数据库
-- sidekiq：用于在后台执行队列任务（异步执行）
-- unicorn：HTTP服务，GitLab Rails应用是托管在这个服务器上面的
+> 安装过程分为在线和离线，都是通过
+> [清华源-GitLab](https://mirrors.tuna.tsinghua.edu.cn/gitlab-ce/yum/el7/) 来进行安装
 
-主要程序目录：
-- 主配置文件: /etc/gitlab/gitlab.rb
-- 文档根目录: /opt/gitlab
-- 默认存储库位置: /var/opt/gitlab/git-data/repositories
-- Nginx配置文件: /var/opt/gitlab/nginx/conf/gitlab-http.conf
-- Postgresql数据目录: /var/opt/gitlab/postgresql/data
+### 在线安装
 
-## 安装程序
-
-[清华源-GitLab]:https://mirrors.tuna.tsinghua.edu.cn/gitlab-ce/yum/el7/
-
-![image-20220111165225877](https://yuikuen-1259273046.cos.ap-guangzhou.myqcloud.com/devops/image-20220111165225877.png)
-
-- 方法一：配置源地址，再通过 yum 在线安装指定版本
-
+1）配置清华源，查看现有版本并直接下载安装
 ```bash
 $ cat /etc/yum.repos.d/gitlab-ce.repo
 [gitlab-ce]
@@ -61,30 +47,36 @@ $ yum list | grep gitlab-ce
 $ yum -y install gitlab-ce-14.1.0
 ```
 
-- 方法二：下载 rpm 文件，再离线安装指定版本
+### 离线安装
+
+1）到清华源下载 rpm 源文件，直接解压安装
 
 ```bash
-$ wget https://mirrors.tuna.tsinghua.edu.cn/gitlab-ce/yum/el7/gitlab-ce-14.1.0-ce.0.el7.x86_64.rpm
+$ wget https://mirrors.tuna.tsinghua.edu.cn/gitlab-ce/yum/el7/gitlab-ce-14.1.0-ce.0.el7.x86_64.rpm --no-check-certificate
 $ rpm -ivh gitlab-ce-14.1.0-ce.0.el7.x86_64.rpm --force --nodeps
 ```
 
 ## 配置程序
 
-1)修改 `/etc/gitlab/gitlab.rb` 配置文件
+> 默认的安装配置直接初始化就可以使用，其它设置可根据[官网配置](https://docs.gitlab.cn/jh/install/next_steps.html)
+
+1）修改 `/etc/gitlab/gitlab.rd` 配置文件
 
 ```bash
-## GitLab URL 可为域名或本机IP
-external_url 'http://188.188.4.141'
+## GitLab URL 
+# 根据实际配置，IP或域名
+# external_url 'http://gitlab.example.com'
+external_url 'http://ip or hostname'
 ```
 
-2)初始化服务，每次修改配置后需要执行初始化命令并重启方可生效
+2）初始化服务，注意每次修改配置后需要执行方可生效
 
 ```bash
 $ gitlab-ctl reconfigure
 $ gitlab-ctl restart
 ```
 
-3)部署成功后，初始管理员用户为 root，密码在安装过程中随机生成并保存在 `/etc/gitlab/initial_root_password`，有效期为 24 小时
+3）初始管理员为 root，密码随机生成并保存在 `/etc/gitlab/initial_root_password`，有效期为 24 小时
 
 ```bash
 Running handlers:
@@ -113,7 +105,7 @@ Password: d5WxYmXvXbEOfpzm/LZ6Bibmc+HzNTGpjNQU/3hdbh0=
 # NOTE: This file will be automatically deleted in the first reconfigure run after 24 hours.
 ```
 
-4)查看服务状态，并浏览器登录验证
+4）查看服务状态，并登录浏览器验证
 
 ```bash
 $ gitlab-ctl status
@@ -142,19 +134,4 @@ nginx   3161 gitlab-www    7u  IPv4  28763      0t0  TCP *:http (LISTEN)
 nginx   3162 gitlab-www    7u  IPv4  28763      0t0  TCP *:http (LISTEN)
 ```
 
-![image-20220111183425464](https://yuikuen-1259273046.cos.ap-guangzhou.myqcloud.com/devops/image-20220111183425464.png)
-
-## 基本操作
-
-- 控制台打开：gitlab-rails
-- 数据库命令：gitlab-psql
-- 数据备份还原：gitlab-rake
-- 客户端操作命令：gitlab-ctl
-  - 启动：gitlab-ctl start
-  - 停止：gitlab-ctl stop
-  - 重启：gitlab-ctl restart
-  - 查看：gitlab-ctl status
-  - 日志：gitlab-ctl tail nginx(组件)
-
-**参考链接：**
-- [Install self-managed GitLab](https://about.gitlab.com/install/#already-installed)
+![](https://yuikuen-1259273046.cos.ap-guangzhou.myqcloud.com/devops/image-20220111183425464.png)

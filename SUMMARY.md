@@ -30,11 +30,13 @@
 
 ## OpenLDAP
 
+* [OpenLDAP 简介](openldap/OpenLDAP.md)
 * [OpenLDAP(yum)单节点安装2.4.x](openldap/openldap-yum.md)
 * [OpenLDAP配置远程SSH登录](openldap/openldap-client.md)
-* [OpenLDAP配置公钥(PublicKey)远程登录客户机](openldap/openldap-publickey.md)
+* [OpenLDAP配置密钥远程登录客户机](openldap/openldap-publickey.md)
 * [OpenLDAP启用MemberOf属性](openldap/openldap-memberof.md)
 * [OpenLDAP创建用户&用户组](openldap/openldap-users.md)
+* [OpenLDAP配置sudo权限管理](openldap/openldap-sudo.md)
 ## RabbitMQ
 
 * [RabbitMQ(rpm)安装3.8.x](rabbitmq/rabbitmq-rpm.md)
