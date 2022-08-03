@@ -21,7 +21,7 @@ $ systemctl disable --now firewalld.service
 2）下载依赖组件
 
 ```bash
-$ yum install policycoreutils openssh-server openssh-clients postfix
+$ yum -y install policycoreutils openssh-server openssh-clients postfix
 $ systemctl enable --now sshd postfix
 ```
 

@@ -149,7 +149,7 @@ modifying entry "olcDatabase={2}hdb,cn=config"
 4）通过 `slaptest` 查看验证是否有问题
 
 ```bash
-slaptest -u
+$ slaptest -u
 config file testing succeeded
 ```
 

@@ -22,7 +22,7 @@ Updating / installing...
 > lt 为长期维护版本，ml 为主线最新版本
 
 ```bash
-yum --disablerepo="*" --enablerepo="elrepo-kernel" list available
+$ yum --disablerepo="*" --enablerepo="elrepo-kernel" list available
 Loaded plugins: fastestmirror
 Loading mirror speeds from cached hostfile
  * elrepo-kernel: mirror.rackspace.com
