@@ -20,6 +20,15 @@
 * [GitLab_Install](GitLab/gitlab_install.md)
 * [GitLab_LDAP](GitLab/gitlab_ldap.md)
 
+## Java
+
+* [Java_Install(jdk8)](Java/java_install01.md)
+* [Java_install(jdk11)](Java/java_install02.md)
+
+## Jenkins
+
+* [Jenkins_Install(RPM)](Jenkins/jenkins_install01.md)
+* [Jenkins_Install(War)](Jenkins/jenkins_install02.md)
 ## OpenLDAP
 
 * [OpenLDAP_Intro](OpenLDAP/openldap_intro.md)
@@ -30,3 +39,13 @@
 * [OpenLDAP_Client](OpenLDAP/openldap_client.md)
 * [OpenLDAP_PublicKey](OpenLDAP/openldap_publickey.md)
 * [OpenLDAP_Sudo](OpenLDAP/openldap_sudo.md)
+
+## RabbitMQ
+
+* [RabbitMQ_Install(RPM)](RabbitMQ/rabbitmq_install01.md)
+* [RabbitMQ_Install(Source)](RabbitMQ/rabbitmq_install02.md)
+
+## Redis
+
+* [Redis_Install(Source)](Redis/redis_install.md)
+* [Redis_Bug](Redis/redis_bug.md)
