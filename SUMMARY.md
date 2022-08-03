@@ -29,6 +29,7 @@
 
 * [Jenkins_Install(RPM)](Jenkins/jenkins_install01.md)
 * [Jenkins_Install(War)](Jenkins/jenkins_install02.md)
+* [Jenkins_LDAP](Jenkins/jenkins_ldap.md)
 ## OpenLDAP
 
 * [OpenLDAP_Intro](OpenLDAP/openldap_intro.md)
