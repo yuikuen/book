@@ -52,7 +52,7 @@ adding new entry "cn=Jenkins,ou=Group,dc=yuikuen,dc=top"
 
 ## Jenkins 配置
 
-> 注意：版本必须 \geq 2.277.x，并且要 \leq 2.332.x
+> 注意：版本必须 \geq 2.277.x，并且要 \leq 2.289.x
 
 1）下载 `ldap` 插件
 
