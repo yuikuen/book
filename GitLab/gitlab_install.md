@@ -1,4 +1,4 @@
-# GitLab Install(rpm)
+# GitLab Install(RPM)
 
 > Linux 快速安装，通过 rpm 源进行在线或离线安装
 

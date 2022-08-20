@@ -6,6 +6,8 @@
 
 1）提前创建功能组并绑定用户
 
+> Update：此处需要注意，用户的密码需要改为 `md5` 之类的密码，否则会提示 ERROR
+
 ```bash
 $ cat user_jenkins.ldif
 dn: uid=pm001,ou=pm,ou=People,dc=yuikuen,dc=top

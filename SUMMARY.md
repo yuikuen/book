@@ -30,6 +30,13 @@
 * [Jenkins_Install(RPM)](Jenkins/jenkins_install01.md)
 * [Jenkins_Install(War)](Jenkins/jenkins_install02.md)
 * [Jenkins_LDAP](Jenkins/jenkins_ldap.md)
+
+## Kubernetes
+
+* [K8s_Install-1.23.x(Src)](Kubernetes/k8s_install-1.23.x(src).md)
+* [K8s_Install-1.24.x(Src)](Kubernetes/k8s_install-1.24.x(src).md)
+* [K8s_Calico-bug](Kubernetes/k8s_calico-bug.md)
+
 ## OpenLDAP
 
 * [OpenLDAP_Intro](OpenLDAP/openldap_intro.md)
@@ -50,3 +57,7 @@
 
 * [Redis_Install(Source)](Redis/redis_install.md)
 * [Redis_Bug](Redis/redis_bug.md)
+
+## WireGuard
+
+* [WireGuard_Install](WireGuard/wireguard_install.md)

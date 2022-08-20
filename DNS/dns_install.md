@@ -1,4 +1,4 @@
-# DNS Install
+# DNS Install(YUM)
 
 > DNS(Domain Name Service) 域名解析服务，就是将域名和 ip 之间做相应的转换，以下为快速安装 bind9 实现内网 DNS 服务
 

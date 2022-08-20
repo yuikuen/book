@@ -1,4 +1,4 @@
-# RabbitMQ Install(Source)
+# RabbitMQ Install(SRC)
 
 > 源码安装 RabbitMQ 3.9.x
 

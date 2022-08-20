@@ -14,7 +14,7 @@ $ rpm -Uvh https://www.elrepo.org/elrepo-release-7.el7.elrepo.noarch.rpm
 Retrieving https://www.elrepo.org/elrepo-release-7.el7.elrepo.noarch.rpm
 Preparing...                          ################################# [100%]
 Updating / installing...
-   1:elrepo-release-7.0-6.el7.elrepo  ################################# [100%
+   1:elrepo-release-7.0-6.el7.elrepo  ################################# [100%]
 ```
 
 2）查看现可提供升级的版本
@@ -111,4 +111,7 @@ done
 ```bash
 $ rpm -qa | grep kernel
 $ yum -y remove $(rpm -qa | grep kernel | grep '3')
+0 : CentOS Linux (5.18.14-1.el7.elrepo.x86_64) 7 (Core)
+1 : CentOS Linux (3.10.0-1160.el7.x86_64) 7 (Core)
+2 : CentOS Linux (0-rescue-77ada07bc97843b3a8e034039509ee14) 7 (Core)
 ```

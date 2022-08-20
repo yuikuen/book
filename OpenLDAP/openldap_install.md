@@ -1,4 +1,4 @@
-# OpenLDAP Install
+# OpenLDAP Install(YUM)
 
 ## 版本环境
 
