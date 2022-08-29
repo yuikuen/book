@@ -1,8 +1,8 @@
 # OpenLDAP Install(YUM)
 
-## 版本环境
-
 > 为了简化 OpenLDAP 的安装复杂程序，直接通过 YUM 源安装，需要定制的才使用编译方式安装，另开篇讲解
+
+## 版本环境
 
 - System：CentOS7.9.2009 Minimal
 - OpenLDAP：openldap-2.4.44-25.el7_9.x86_64

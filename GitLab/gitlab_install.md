@@ -73,7 +73,6 @@ external_url 'http://ip or hostname'
 
 ```bash
 $ gitlab-ctl reconfigure
-$ gitlab-ctl restart
 ```
 
 3）初始管理员为 root，密码随机生成并保存在 `/etc/gitlab/initial_root_password`，有效期为 24 小时

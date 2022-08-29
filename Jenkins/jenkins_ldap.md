@@ -88,3 +88,21 @@ adding new entry "cn=Jenkins,ou=Group,dc=yuikuen,dc=top"
 
 ![](https://yuikuen-1259273046.cos.ap-guangzhou.myqcloud.com/devops/20220804141147.png)
 
+**个人配置，仅供参考**
+
+```bash
+Server：188.188.4.204
+root DN：dc=yuikuen,dc=top
+Allow blank rootDN：勾选
+User search base：ou=People
+User search filter：uid={0}
+Group search base：ou=Group
+Group search filter：(& (cn=jenkins) (objectclass=groupOfUniqueNames) )
+Group membership：memberOf # 选项Parse user attribute for list of LDAP groups
+Manager DN：cn=Manager,dc=yuikuen,dc=top
+Manager Password：*
+Display Name LDAP attribute：displayname
+Email Address LDAP attribute：mail
+```
+
+![](https://yuikuen-1259273046.cos.ap-guangzhou.myqcloud.com/devops/20220825153319.png)

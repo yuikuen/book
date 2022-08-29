@@ -1,4 +1,4 @@
-# Java Install(Source)
+# Java Install(SRC)
 
 > 源码编译安装 Java 1.8.x
 

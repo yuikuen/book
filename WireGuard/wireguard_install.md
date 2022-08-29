@@ -85,11 +85,12 @@ ListenPort = 51820
 PrivateKey = YLclRLq4RAlzTz4qz9+E4lBFmlJv9OUw43P7cQlNXnc= 
 
 [peer]
-# 
+# Office 
 PublicKey = cfRUoERvMRp2IXsmzhYhChYMp+Zfaes0ROlmz8+4nlo= 
 AllowedIPs = 6.6.6.2/24,188.188.3.33/24,188.188.4.0/24
 
 [Peer]
+# Home
 PublicKey = 1YjZk/t/5HYiSMaYjnQurS4VwlCn0ip5MvY75iCg0Fs=
 AllowedIPs = 6.6.6.3/24
 ```
@@ -176,6 +177,15 @@ PublicKey = EX7D+TfIMZprYsUCXH0hzYU4/ud//Zr8nF9iRX0hFQA=
 AllowedIPs = 6.6.6.0/24, 188.188.3.33/24, 188.188.4.0/24
 Endpoint = 107.148.13.1:51820
 PersistentKeepalive = 15
+```
+
+## 基本操作
+
+```bash
+# 不中断活跃连接的情况下重新加载配置文件：
+$ wg syncconf wg0 <(wg-quick strip wg0)
+
+$ wg-quick down wg0 && wg-quick up wg0
 ```
 
 ## 参考链接

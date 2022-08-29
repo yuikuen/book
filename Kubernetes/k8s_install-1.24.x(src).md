@@ -1563,70 +1563,18 @@ $ systemctl status kubelet
    CGroup: /system.slice/kubelet.service
            └─72194 /usr/local/bin/kubelet --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.kubeconfig --kubeconfig=/etc/kubernetes/kubelet.kubeconfig --config=/etc/kubernetes/kubelet-conf.yml --co...
 
-Aug 19 12:05:33 prod-m01 kubelet[72194]: I0819 12:05:33.688575   72194 state_mem.go:88] "Updated default CPUSet" cpuSet=""
-Aug 19 12:05:33 prod-m01 kubelet[72194]: I0819 12:05:33.688594   72194 state_mem.go:96] "Updated CPUSet assignments" assignments=map[]
-Aug 19 12:05:33 prod-m01 kubelet[72194]: I0819 12:05:33.688605   72194 policy_none.go:49] "None policy: Start"
-Aug 19 12:05:33 prod-m01 kubelet[72194]: I0819 12:05:33.689304   72194 memory_manager.go:168] "Starting memorymanager" policy="None"
-Aug 19 12:05:33 prod-m01 kubelet[72194]: I0819 12:05:33.689330   72194 state_mem.go:35] "Initializing new in-memory state store"
-Aug 19 12:05:33 prod-m01 kubelet[72194]: I0819 12:05:33.689497   72194 state_mem.go:75] "Updated machine memory state"
-Aug 19 12:05:33 prod-m01 kubelet[72194]: I0819 12:05:33.697251   72194 manager.go:610] "Failed to read data from checkpoint" checkpoint="kubelet_internal_checkpoint" err="checkpoint is not found"
-Aug 19 12:05:33 prod-m01 kubelet[72194]: I0819 12:05:33.697946   72194 plugin_manager.go:114] "Starting Kubelet Plugin Manager"
-Aug 19 12:05:34 prod-m01 kubelet[72194]: I0819 12:05:34.533190   72194 apiserver.go:52] "Watching apiserver"
-Aug 19 12:05:34 prod-m01 kubelet[72194]: I0819 12:05:34.558239   72194 reconciler.go:159] "Reconciler: start to sync state"
+Aug 19 12:05:33 k8s-master01 kubelet[72194]: I0819 12:05:33.688575   72194 state_mem.go:88] "Updated default CPUSet" cpuSet=""
+Aug 19 12:05:33 k8s-master01 kubelet[72194]: I0819 12:05:33.688594   72194 state_mem.go:96] "Updated CPUSet assignments" assignments=map[]
+...
 ```
-
 注意：`Active: active (running)` 并不代表完全正常，信息输出 `E0819` + `Error ...` 同样是失败
-
-```bash
-● kubelet.service - Kubernetes Kubelet
-   Loaded: loaded (/usr/lib/systemd/system/kubelet.service; enabled; vendor preset: disabled)
-  Drop-In: /etc/systemd/system/kubelet.service.d
-           └─10-kubelet.conf
-   Active: active (running) since Fri 2022-08-19 12:04:17 CST; 4s ago
-     Docs: https://github.com/kubernetes/kubernetes
- Main PID: 71999 (kubelet)
-    Tasks: 18
-   Memory: 37.3M
-   CGroup: /system.slice/kubelet.service
-           └─71999 /usr/local/bin/kubelet --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.kubeconfig --kubeconfig=/etc/kubernetes/kubelet.kubeconfig --config=/etc/kubernetes/kubelet-conf.yml --co...
-
-Aug 19 12:04:20 prod-m01 kubelet[71999]: E0819 12:04:20.942037   71999 kubelet_node_status.go:92] "Unable to register node with API server" err="nodes is forbidden: User \"system:anonymous\"...ode="prod-m01"
-Aug 19 12:04:20 prod-m01 kubelet[71999]: E0819 12:04:20.943233   71999 event.go:267] Server rejected event '&v1.Event{TypeMeta:v1.TypeMeta{Kind:"", APIVersion:""}, ObjectMeta:v1.ObjectMeta{N...tionTimestamp:
-Aug 19 12:04:20 prod-m01 kubelet[71999]: E0819 12:04:20.944182   71999 event.go:267] Server rejected event '&v1.Event{TypeMeta:v1.TypeMeta{Kind:"", APIVersion:""}, ObjectMeta:v1.ObjectMeta{N...tionTimestamp:
-Aug 19 12:04:21 prod-m01 kubelet[71999]: E0819 12:04:21.039783   71999 kubelet.go:2424] "Error getting node" err="node \"prod-m01\" not found"
-Aug 19 12:04:21 prod-m01 kubelet[71999]: E0819 12:04:21.140470   71999 kubelet.go:2424] "Error getting node" err="node \"prod-m01\" not found"
-Aug 19 12:04:21 prod-m01 kubelet[71999]: E0819 12:04:21.241184   71999 kubelet.go:2424] "Error getting node" err="node \"prod-m01\" not found"
-Aug 19 12:04:21 prod-m01 kubelet[71999]: E0819 12:04:21.342348   71999 kubelet.go:2424] "Error getting node" err="node \"prod-m01\" not found"
-Aug 19 12:04:21 prod-m01 kubelet[71999]: E0819 12:04:21.442975   71999 kubelet.go:2424] "Error getting node" err="node \"prod-m01\" not found"
-Aug 19 12:04:21 prod-m01 kubelet[71999]: E0819 12:04:21.543710   71999 kubelet.go:2424] "Error getting node" err="node \"prod-m01\" not found"
-Aug 19 12:04:21 prod-m01 kubelet[71999]: E0819 12:04:21.644312   71999 kubelet.go:2424] "Error getting node" err="node \"prod-m01\" not found"
-Hint: Some lines were ellipsized, use -l to show in full.
-```
 
 3）查看系统日志和集群状态
 
 ```bash
 # 如果正常日志信息不会循环打印
 $ tail -f /var/log/messages
-Aug 19 12:05:33 prod-m01 kube-controller-manager: I0819 12:05:33.712933   70002 controller.go:265] Node changes detected, triggering a full node sync on all loadbalancer services
-Aug 19 12:05:33 prod-m01 kube-controller-manager: W0819 12:05:33.716882   70002 topologycache.go:199] Can't get CPU or zone information for prod-m01 node
-Aug 19 12:05:33 prod-m01 kube-controller-manager: I0819 12:05:33.716900   70002 topologycache.go:215] Insufficient node info for topology hints (0 zones, %!s(int64=0) CPU, false)
-Aug 19 12:05:33 prod-m01 kube-controller-manager: I0819 12:05:33.716914   70002 controller.go:265] Node changes detected, triggering a full node sync on all loadbalancer services
-Aug 19 12:05:34 prod-m01 kubelet: I0819 12:05:34.533190   72194 apiserver.go:52] "Watching apiserver"
-Aug 19 12:05:34 prod-m01 kubelet: I0819 12:05:34.558239   72194 reconciler.go:159] "Reconciler: start to sync state"
-Aug 19 12:07:26 prod-m01 etcd: {"level":"info","ts":"2022-08-19T12:07:26.779+0800","caller":"mvcc/index.go:214","msg":"compact tree index","revision":22313}
-Aug 19 12:07:26 prod-m01 etcd: {"level":"info","ts":"2022-08-19T12:07:26.781+0800","caller":"mvcc/kvstore_compaction.go:57","msg":"finished scheduled compaction","compact-revision":22313,"took":"1.171163ms"}
-Aug 19 12:10:01 prod-m01 systemd: Started Session 400 of user root.
-Aug 19 12:10:01 prod-m01 systemd: Started Session 401 of user root.
-
-
 $ kubectl get node
-NAME       STATUS   ROLES    AGE     VERSION
-prod-m01   Ready    <none>   6m37s   v1.24.4
-prod-m02   Ready    <none>   6m36s   v1.24.4
-prod-m03   Ready    <none>   6m37s   v1.24.4
-prod-n01   Ready    <none>   6m37s   v1.24.4
-prod-n02   Ready    <none>   6m37s   v1.24.4
 ```
 此处的 `Ready` 不代表 Node 连接正常，还需要配置 Proxy/Calico/CoreDNS
 

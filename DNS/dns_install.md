@@ -96,6 +96,7 @@ zone "4.188.188.in-addr.arpa" IN {
 	type master;
 	file "188.188.4.arpa";
 	allow-update { none; };
+};
 ```
 
 3）数据配置文件
@@ -145,7 +146,11 @@ $ chown named.named yuikuen.top.zone 188.188.4.arpa
 # 验证配置文件格式
 $ named-checkconf /etc/named.conf
 $ named-checkzone yuikuen.top /var/named/yuikuen.top.zone
+zone yuikuen.top/IN: loaded serial 0
+OK
 $ named-checkzone 188.188.4.arpa /var/named/188.188.4.arpa
+zone 188.188.4.arpa/IN: loaded serial 0
+OK
 
 # 刷新配置，重启服务
 $ rndc reload
