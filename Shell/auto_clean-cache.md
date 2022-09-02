@@ -1,5 +1,12 @@
 # Auto Clean-Cache
 
+> 每天零晨执行脚本进行检测并清理
+
+```bash
+$ crontab -l
+0 0 * * * /bin/bash -x /opt/sh/auto_clean-cache.sh > /dev/null 2>&1
+```
+
 ## 示例 1
 
 ```bash

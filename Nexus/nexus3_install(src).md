@@ -1,9 +1,9 @@
-# Nexus3 Install
+# Nexus3 Install(SRC)
 
 ## 版本环境
 
 - System：CentOS7.9.2009 Minimal
-- Java：
+- Java：jdk-8u333-linux-x64
 - Nexus：nexus-3.41.1-01-unix
 
 ```bash
