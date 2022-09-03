@@ -247,7 +247,7 @@ Aug 29 11:54:44 debug systemd[1]: Started LSB: start and stop MySQL.
 
 6）修改默认密码
 
-```m
+```sql
 $ egrep 'temporary|password' /opt/db/mysql/logs/mysql_error.log
 2022-08-29T11:49:46.931754+08:00 6 [Note] [MY-010454] [Server] A temporary password is generated for root@localhost: 9sqj0p1S:Nuh
 
@@ -316,13 +316,13 @@ All done!
 
 8）创建用户并授权
 
-```mysql
+```sql
 # 本地登录用户
 mysql> create user 'test'@'localhost' identified by '123456';
 # 远程登录用户
 mysql> create user 'test'@'%' identified by '123456';
 
 # 授权数据库所有表的所有操作给test用户
-mysql> grant all privileges on *.* to 'test'@'localhost'
-mysql> grant all privileges on *.* to 'test'@'%'
+mysql> grant all privileges on *.* to 'test'@'localhost' with grant option;
+mysql> grant all privileges on *.* to 'test'@'%' with grant option;
 ```
