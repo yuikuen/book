@@ -1,7 +1,7 @@
-# K8s Install(SRC_1.24.x)
+# K8s Install(SRC_1.24.x-Data Alone)
 
-> Kubernetes 二进制安装高可用 1.24.x
-> 
+> Kubernetes 二进制安装高可用集群(1.24.x) + Etcd(Alone)
+>
 > PS：安装前必须提前查看 [K8s-1.24.x 官方说明](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.24.md#deprecation)，内有弃用参数说明。另有 [原文](https://sysdig.com/blog/kubernetes-1-24-whats-new/)/[译文](https://zhuanlan.zhihu.com/p/509074307) 参考
 
 ## 版本环境
@@ -21,11 +21,17 @@
 
 **安装规划**
 
-| hostname | ServerIP | Module |
+|HostName|ServerIP|Module|
 |--|--|--|
-|k8s-master-lb|188.188.4.120|KeepAlived IP(VIP)|
-|k8s-master01~03|188.188.4.121~123|kube-apiserver,kube-controller-manager,kube-scheduler,etcd,kubelet,kube-proxy,containerd|
-|k8s-node01~02|188.188.4.124~125|kubelet,kube-proxy,containerd|
+|dglocal-1884141-datastorage01|188.188.4.141|Etcd|
+|dglocal-1884142-datastorage02|188.188.4.142|Etcd|
+|dglocal-1884143-datastorage03|188.188.4.143|Etcd|
+|dglocal-1884150-k8smaster-lb|188.188.4.150|VIP_IP|
+|dglocal-1884151-k8smaster01|188.188.4.151|kube{-apiserver,-controller-manager,-scheduler,let,-proxy},containerd|
+|dglocal-1884152-k8smaster02|188.188.4.152|kube{-apiserver,-controller-manager,-scheduler,let,-proxy},containerd|
+|dglocal-1884153-k8smaster03|188.188.4.153|kube{-apiserver,-controller-manager,-scheduler,let,-proxy},containerd|
+|dglocal-1884161-k8snode01|188.188.4.161|kubelet,kube-proxy,containerd|
+|dglocal-1884162-k8snode02|188.188.4.162|kubelet,kube-proxy,containerd|
 
 **网络规划**
 
@@ -50,19 +56,27 @@ $ yum install wget jq psmisc lrzsz vim net-tools telnet yum-utils device-mapper-
 2）配置 Hostname & Hosts
 
 ```bash
-$ hostnamectl set-hostname k8s-master01 && bash
-$ hostnamectl set-hostname k8s-master02 && bash
-$ hostnamectl set-hostname k8s-master03 && bash
-$ hostnamectl set-hostname k8s-node01 && bash
-$ hostnamectl set-hostname k8s-node02 && bash
+# 设置各个节点的hostname
+$ hostnamectl set-hostname dglocal-1884141-datastorage01 && bash
+$ hostnamectl set-hostname dglocal-1884142-datastorage02 && bash
+$ hostnamectl set-hostname dglocal-1884143-datastorage03 && bash
+$ hostnamectl set-hostname dglocal-1884151-k8smaster01 && bash
+$ hostnamectl set-hostname dglocal-1884152-k8smaster02 && bash
+$ hostnamectl set-hostname dglocal-1884153-k8smaster03 && bash
+$ hostnamectl set-hostname dglocal-1884161-k8snode01 && bash
+$ hostnamectl set-hostname dglocal-1884162-k8snode02 && bash
 
+# 所有节点配置hosts文件
 $ cat >> /etc/hosts << EOF
-188.188.4.121 k8s-master01  # 6C10G 40G
-188.188.4.122 k8s-master02  # 6C10G 40G
-188.188.4.123 k8s-master03  # 6C10G 40G
-188.188.4.120 k8s-master-lb # VIP虚拟IP不占用机器资源
-188.188.4.124 k8s-node01    # 4C10G 40G
-188.188.4.125 k8s-node02    # 4C10G 40G
+188.188.4.141 dglocal-1884141-datastorage01
+188.188.4.142 dglocal-1884142-datastorage02
+188.188.4.143 dglocal-1884143-datastorage03
+188.188.4.150 dglocal-1884150-k8smaster-lb
+188.188.4.151 dglocal-1884151-k8smaster01
+188.188.4.152 dglocal-1884152-k8smaster02
+188.188.4.153 dglocal-1884153-k8smaster03
+188.188.4.161 dglocal-1884161-k8snode01
+188.188.4.162 dglocal-1884162-k8snode02
 EOF
 ```
 
@@ -115,17 +129,20 @@ $ vim /etc/security/limits.conf
 
 7）配置密钥，实现免密登录
 
-> Master01 节点操作，发送至其他节点
+> 所有节点操作，互发送至每个节点
 
 ```bash
 $ ssh-keygen -t rsa -P "" -f /root/.ssh/id_rsa
-$ for i in k8s-master01 k8s-master02 k8s-master03 k8s-node01 k8s-node02;do
+$ DataNodes='dglocal-1884141-datastorage01 dglocal-1884142-datastorage02 dglocal-1884143-datastorage03'
+$ MasterNodes='dglocal-1884151-k8smaster01 dglocal-1884152-k8smaster02 dglocal-1884153-k8smaster03'
+$ WorkNodes='dglocal-1884161-k8snode01 dglocal-1884162-k8snode02'
+$ for NODE in $DataNodes $MasterNodes $WorkNodes;do
 expect -c "
-spawn ssh-copy-id -i /root/.ssh/id_rsa.pub root@$i
+spawn ssh-copy-id -i /root/.ssh/id_rsa.pub root@$NODE
         expect {
                 \"*yes/no*\" {send \"yes\r\"; exp_continue}
-                \"*password*\" {send \"passwd\r\"; exp_continue}
-                \"*Password*\" {send \"passwd\r\";}
+                \"*password*\" {send \"password\r\"; exp_continue}
+                \"*Password*\" {send \"password\r\";}
         } "
 done 
 ```
@@ -137,8 +154,20 @@ done
 1）到 [ELREPO](https://elrepo.org/linux/kernel/) 下载自身需要的 RPM 包
 
 ```bash
+# all nodes
+$ mkdir /opt/software/kernel -p
+
+# Master01下载
 $ wget https://elrepo.org/linux/kernel/el7/x86_64/RPMS/kernel-ml-5.18.14-1.el7.elrepo.x86_64.rpm
 $ wget https://elrepo.org/linux/kernel/el7/x86_64/RPMS/kernel-ml-devel-5.18.14-1.el7.elrepo.x86_64.rpm
+
+$ DataNodes='dglocal-1884141-datastorage01 dglocal-1884142-datastorage02 dglocal-1884143-datastorage03'
+$ MasterNodes='dglocal-1884152-k8smaster02 dglocal-1884153-k8smaster03'
+$ WorkNodes='dglocal-1884161-k8snode01 dglocal-1884162-k8snode02'
+$ for NODE in $DataNodes $MasterNodes $WorkNodes; do 
+  echo $NODE; 
+  scp -r /opt/software/kernel/* $NODE:/opt/software/kernel/;
+done
 ```
 
 2）直接加载安装
@@ -244,82 +273,6 @@ $ lsmod | grep --color=auto -e ip_vs -e nf_conntrack
 
 ## 基本组件
 
-> Containerd Runtime 安装方法有两种，可根据自身需求进行
-
-### Yum
-
-1）查看现有版本
-
-```bash
-$ yum list | grep containerd
-containerd.io.x86_64                      1.6.7-3.1.el7                docker-ce-stable
-
-# 安装docker时，同时安装containerd
-$ yum install docker-ce-20.10.* docker-ce-cli-20.10.* containerd -y 
-```
-
-2）配置 Containerd 所需的模块、内核设置
-
-```bash
-$ cat <<EOF | sudo tee /etc/modules-load.d/containerd.conf
-overlay
-br_netfilter
-EOF
-
-$ modprobe -- overlay
-$ modprobe -- br_netfilter
-
-$ cat <<EOF | sudo tee /etc/sysctl.d/99-kubernetes-cri.conf
-net.bridge.bridge-nf-call-iptables = 1
-net.ipv4.ip_forward = 1
-net.bridge.bridge-nf-call-ip6tables = 1
-EOF
-$ sysctl --system
-```
-
-3）生成 Containerd 的默认配置文件，并将 Cgroup 改为 Systemd，和修改镜像下载地址
-
-```bash
-$ mkdir -p /etc/containerd
-$ containerd config default | tee /etc/containerd/config.toml
-
-# 修改k8s.gcr.io/pause:3.6为registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.6并修改SystemdCgroup为true
-$ sed -i 's#k8s.gcr.io#registry.cn-hangzhou.aliyuncs.com/google_containers#g' /etc/containerd/config.toml
-$ sed -i 's#SystemdCgroup = false#SystemdCgroup = true#g' /etc/containerd/config.toml
-
-# 验证是否已修改
-$ cat /etc/containerd/config.toml | grep -i sandbox_image
-  sandbox_image = "registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.5"
-$ cat /etc/containerd/config.toml | grep -i SystemdCgroup
-  SystemdCgroup = true
-```
-
-4）启动服务并配置 crictl 客户端连接的运行时位置
-
-```bash
-$ systemctl daemon-reload && systemctl enable --now containerd
-
-$ cat > /etc/crictl.yaml <<EOF
-runtime-endpoint: unix:///run/containerd/containerd.sock
-image-endpoint: unix:///run/containerd/containerd.sock
-timeout: 10
-debug: false
-EOF
-
-$ ctr version
-Client:
-  Version:  1.6.7
-  Revision: 3df54a852345ae127d1fa3092b95168e4a88e2f8
-  Go version: go1.17.8
-
-Server:
-  Version:  1.6.7
-  Revision: 3df54a852345ae127d1fa3092b95168e4a88e2f8
-  UUID: d6ad552e-4bd8-498d-a4d1-ddedf391bc1b
-```
-
-### Source
-
 > 安装前需要优先升级 libseccomp，centos7 中 yum 下载的版本是 2.3，需要 2.4 以上
 
 1）查看 libseccomp 版本并作更新
@@ -424,11 +377,11 @@ $ containerd --version
 containerd github.com/containerd/containerd v1.6.8 9cd3357b7fd7218e4aec3eae239db1f68a5a6ec6
 ```
 
-### 镜像加速
+9）配置镜像加速
 
 > 此为示例文件，仅供参考！建议提前下载对应镜像或采用本地私有仓库！
-
-`k8s.gcr.io` 只是名称，实际是从 `endpoint` 地址中拉取镜像
+> 
+> `k8s.gcr.io` 只是名称，可自定义修改，实际是从 `endpoint` 地址中拉取镜像
 
 ```bash
 $ cat /etc/containerd/config.toml | grep -i registry.mirrors -A 1
@@ -439,267 +392,269 @@ $ cat /etc/containerd/config.toml | grep -i registry.mirrors -A 1
           endpoint = ["https://registry.cn-hongkong.aliyuncs.com/yuikuen/"]     
         [plugins."io.containerd.grpc.v1.cri".registry.mirrors."quay.io"]
           endpoint = ["https://registry.cn-hongkong.aliyuncs.com"]
+          
+$ systemctl daemon-reload && systemctl restart containerd
 ```
+
 注：配置镜像加速后需要重启服务
 
-### K8s & Etcd
+## ETCD 数据库
 
-> **注意：选用 K8s 版本前，可查看 K8s CHANGELOG 文件，对照 Etcd 版本**
+> Etcd 数据库-单独部署集群，K8s 集群调用服务
 
-- [Etcd GitHub 地址](https://github.com/etcd-io/etcd/releases)
-- [K8s Server GitHub 地址](https://github.com/kubernetes/kubernetes/tree/master/CHANGELOG)
-
-
-1）提前创建程序目录
+1）下载部署需要的配置文件及自签证书工具
 
 ```bash
-$ mkdir -p /opt/cni/bin /etc/{etcd/ssl,kubernetes/{pki,manifests}} /var/{lib/kubelet,log/kubernetes} /etc/systemd/system/kubelet.service.d
-```
-
-2）下载相关配置文件
-
-```bash
-# Master01操作即可
-$ cd /root/; git clone https://github.com/yuikuen/k8s-install.git
+# Master01上执行操作
+$ cd /root/; git clone https://github.91chi.fun/https://github.com/yuikuen/k8s-install.git
 $ cd /root/k8s-install && git checkout k8s-install_v1.24.x
 
-$ wget https://dl.k8s.io/v1.24.4/kubernetes-server-linux-amd64.tar.gz
-$ wget https://github.com/etcd-io/etcd/releases/download/v3.5.4/etcd-v3.5.4-linux-amd64.tar.gz
-```
-
-3）解压并发至其它节点
-
-```bash
-$ tar -xf kubernetes-server-linux-amd64.tar.gz --strip-components=3 -C /usr/local/bin kubernetes/server/bin/kube{let,ctl,-apiserver,-controller-manager,-scheduler,-proxy}
-$ tar -zxvf etcd-v3.5.4-linux-amd64.tar.gz --strip-components=1 -C /usr/local/bin etcd-v3.5.4-linux-amd64/etcd{,ctl}
-
-$ kubelet --version
-Kubernetes v1.24.4
-
-$ etcdctl version
-etcdctl version: 3.5.4
-API version: 3.5
-```
-
-```bash
-$ MasterNodes='k8s-master02 k8s-master03'
-$ WorkNodes='k8s-node01 k8s-node02'
-$ for NODE in $MasterNodes; do echo $NODE; 
-  scp /usr/local/bin/kube{let,ctl,-apiserver,-controller-manager,-scheduler,-proxy} $NODE:/usr/local/bin/; 
-  scp /usr/local/bin/etcd* $NODE:/usr/local/bin/; 
- done
-$ for NODE in $WorkNodes; do     
-  scp /usr/local/bin/kube{let,-proxy} $NODE:/usr/local/bin/ ; 
- done
-```
-
-## 生成证书
-
-> 下载自签工具，生成证书
-
-```bash
-# Master01操作即可
 $ wget "https://pkg.cfssl.org/R1.2/cfssl_linux-amd64" -O /usr/local/bin/cfssl
 $ wget "https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64" -O /usr/local/bin/cfssljson
 $ chmod +x /usr/local/bin/cfssl /usr/local/bin/cfssljson
 ```
 
-### Etcd 证书
-
-> Master01 节点生成 Etcd 证书，生成证书的 CSR 文件：证书签名请求文件，配置了一些域名、公司、单位
+2）创建证书 & 下载程序并解压分发至各节点
 
 ```bash
+# Master01上执行操作
 $ cd /root/k8s-install/pki
-
-# 生成etcd CA证书和CA证书的key，注意hostname、profile参数要与证书(ca-config.json)设置对应
 $ cfssl gencert -initca etcd-ca-csr.json | cfssljson -bare /etc/etcd/ssl/etcd-ca
 $ cfssl gencert \
   -ca=/etc/etcd/ssl/etcd-ca.pem \
   -ca-key=/etc/etcd/ssl/etcd-ca-key.pem \
   -config=ca-config.json \
-  -hostname=127.0.0.1,k8s-master01,k8s-master02,k8s-master03,188.188.4.121,188.188.4.122,188.188.4.123 \
+  -hostname=127.0.0.1,dglocal-1884141-datastorage01,dglocal-1884142-datastorage02,dglocal-1884143-datastorage03,188.188.4.141,188.188.4.142,188.188.4.143 \
   -profile=kubernetes \
   etcd-csr.json | cfssljson -bare /etc/etcd/ssl/etcd
+
+
+$ for i in dglocal-1884141-datastorage01; do echo $i;
+  ssh $i "
+  wget http://188.188.4.254:81/tools/Linux/Etcd/etcd-v3.5.4-linux-amd64.tar.gz -P /tmp &&
+  tar -zxvf /tmp/etcd-v3.5.4-linux-amd64.tar.gz --strip-components=1 -C /usr/local/bin etcd-v3.5.4-linux-amd64/etcd{,ctl} &&
+  rm -rf /tmp/etcd*
+  ";
+  for d in dglocal-1884141-datastorage01 dglocal-1884142-datastorage02 dglocal-1884143-datastorage03; do echo $d;
+    ssh $d "
+    mkdir -p /etc/etcd/ssl &&
+    mkdir -p /etc/kubernetes/pki/etcd
+    ";
+    for FILE in etcd-ca-key.pem etcd-ca.pem etcd-key.pem etcd.pem; do
+      scp /etc/etcd/ssl/${FILE} $d:/etc/etcd/ssl/${FILE}
+      scp $i:/usr/local/bin/* $d:/usr/local/bin/;
+      done
+    done
+  done
 ```
 
-```bash
-$ MasterNodes='k8s-master02 k8s-master03'
-$ WorkNodes='k8s-node01 k8s-node02'
-$ for NODE in $MasterNodes; do
-    ssh $NODE "mkdir -p /etc/etcd/ssl"
-     for FILE in etcd-ca-key.pem  etcd-ca.pem  etcd-key.pem  etcd.pem; do
-       scp /etc/etcd/ssl/${FILE} $NODE:/etc/etcd/ssl/${FILE}
-     done
- done
+3）连至各数据服务器创建配置文件
+
+- Etcd Data01
+
+```yaml
+$ ssh dglocal-1884141-datastorage01
+$ cat /etc/etcd/etcd.config.yml
+name: 'dglocal-1884141-datastorage01'
+data-dir: /var/lib/etcd
+wal-dir: /var/lib/etcd/wal
+snapshot-count: 5000
+heartbeat-interval: 100
+election-timeout: 1000
+quota-backend-bytes: 0
+listen-peer-urls: 'https://188.188.4.141:2380'
+listen-client-urls: 'https://188.188.4.141:2379,http://127.0.0.1:2379'
+max-snapshots: 3
+max-wals: 5
+cors:
+initial-advertise-peer-urls: 'https://188.188.4.141:2380'
+advertise-client-urls: 'https://188.188.4.141:2379'
+discovery:
+discovery-fallback: 'proxy'
+discovery-proxy:
+discovery-srv:
+initial-cluster: 'dglocal-1884141-datastorage01=https://188.188.4.141:2380,dglocal-1884142-datastorage02=https://188.188.4.142:2380,dglocal-1884143-datastorage03=https://188.188.4.143:2380'
+initial-cluster-token: 'etcd-k8s-cluster'
+initial-cluster-state: 'new'
+strict-reconfig-check: false
+enable-v2: true
+enable-pprof: true
+proxy: 'off'
+proxy-failure-wait: 5000
+proxy-refresh-interval: 30000
+proxy-dial-timeout: 1000
+proxy-write-timeout: 5000
+proxy-read-timeout: 0
+client-transport-security:
+  cert-file: '/etc/kubernetes/pki/etcd/etcd.pem'
+  key-file: '/etc/kubernetes/pki/etcd/etcd-key.pem'
+  client-cert-auth: true
+  trusted-ca-file: '/etc/kubernetes/pki/etcd/etcd-ca.pem'
+  auto-tls: true
+peer-transport-security:
+  cert-file: '/etc/kubernetes/pki/etcd/etcd.pem'
+  key-file: '/etc/kubernetes/pki/etcd/etcd-key.pem'
+  peer-client-cert-auth: true
+  trusted-ca-file: '/etc/kubernetes/pki/etcd/etcd-ca.pem'
+  auto-tls: true
+debug: false
+log-package-levels:
+log-outputs: [default]
+force-new-cluster: false
 ```
 
-### K8s 组件证书
+- Etcd Data02
 
-> 如不做高可用集群，10.96.0.1 将改成 Master01 的 IP
-
-1）生成各组件证书
-
-```bash
-$ cfssl gencert -initca ca-csr.json | cfssljson -bare /etc/kubernetes/pki/ca
+```yaml
+$ ssh dglocal-1884142-datastorage02
+$ cat /etc/etcd/etcd.config.yml
+name: 'dglocal-1884142-datastorage02'
+data-dir: /var/lib/etcd
+wal-dir: /var/lib/etcd/wal
+snapshot-count: 5000
+heartbeat-interval: 100
+election-timeout: 1000
+quota-backend-bytes: 0
+listen-peer-urls: 'https://188.188.4.142:2380'
+listen-client-urls: 'https://188.188.4.142:2379,http://127.0.0.1:2379'
+max-snapshots: 3
+max-wals: 5
+cors:
+initial-advertise-peer-urls: 'https://188.188.4.142:2380'
+advertise-client-urls: 'https://188.188.4.142:2379'
+discovery:
+discovery-fallback: 'proxy'
+discovery-proxy:
+discovery-srv:
+initial-cluster: 'dglocal-1884141-datastorage01=https://188.188.4.141:2380,dglocal-1884142-datastorage02=https://188.188.4.142:2380,dglocal-1884143-datastorage03=https://188.188.4.143:2380'
+initial-cluster-token: 'etcd-k8s-cluster'
+initial-cluster-state: 'new'
+strict-reconfig-check: false
+enable-v2: true
+enable-pprof: true
+proxy: 'off'
+proxy-failure-wait: 5000
+proxy-refresh-interval: 30000
+proxy-dial-timeout: 1000
+proxy-write-timeout: 5000
+proxy-read-timeout: 0
+client-transport-security:
+  cert-file: '/etc/kubernetes/pki/etcd/etcd.pem'
+  key-file: '/etc/kubernetes/pki/etcd/etcd-key.pem'
+  client-cert-auth: true
+  trusted-ca-file: '/etc/kubernetes/pki/etcd/etcd-ca.pem'
+  auto-tls: true
+peer-transport-security:
+  cert-file: '/etc/kubernetes/pki/etcd/etcd.pem'
+  key-file: '/etc/kubernetes/pki/etcd/etcd-key.pem'
+  peer-client-cert-auth: true
+  trusted-ca-file: '/etc/kubernetes/pki/etcd/etcd-ca.pem'
+  auto-tls: true
+debug: false
+log-package-levels:
+log-outputs: [default]
+force-new-cluster: false
 ```
 
-- ApiServer
+- Etcd Data03
 
-```bash
-$ cfssl gencert \
-  -ca=/etc/kubernetes/pki/ca.pem \
-  -ca-key=/etc/kubernetes/pki/ca-key.pem \
-  -config=ca-config.json \
-  -hostname=10.96.0.1,188.188.4.120,127.0.0.1,kubernetes,kubernetes.default,kubernetes.default.svc,kubernetes.default.svc.cluster,kubernetes.default.svc.cluster.local,188.188.4.121,188.188.4.122,188.188.4.123 \
-  -profile=kubernetes \
-  apiserver-csr.json | cfssljson -bare /etc/kubernetes/pki/apiserver
+```yaml
+$ ssh dglocal-1884143-datastorage03
+$ cat /etc/etcd/etcd.config.yml
+name: 'dglocal-1884143-datastorage03'
+data-dir: /var/lib/etcd
+wal-dir: /var/lib/etcd/wal
+snapshot-count: 5000
+heartbeat-interval: 100
+election-timeout: 1000
+quota-backend-bytes: 0
+listen-peer-urls: 'https://188.188.4.143:2380'
+listen-client-urls: 'https://188.188.4.143:2379,http://127.0.0.1:2379'
+max-snapshots: 3
+max-wals: 5
+cors:
+initial-advertise-peer-urls: 'https://188.188.4.143:2380'
+advertise-client-urls: 'https://188.188.4.143:2379'
+discovery:
+discovery-fallback: 'proxy'
+discovery-proxy:
+discovery-srv:
+initial-cluster: 'dglocal-1884141-datastorage01=https://188.188.4.141:2380,dglocal-1884142-datastorage02=https://188.188.4.142:2380,dglocal-1884143-datastorage03=https://188.188.4.143:2380'
+initial-cluster-token: 'etcd-k8s-cluster'
+initial-cluster-state: 'new'
+strict-reconfig-check: false
+enable-v2: true
+enable-pprof: true
+proxy: 'off'
+proxy-failure-wait: 5000
+proxy-refresh-interval: 30000
+proxy-dial-timeout: 1000
+proxy-write-timeout: 5000
+proxy-read-timeout: 0
+client-transport-security:
+  cert-file: '/etc/kubernetes/pki/etcd/etcd.pem'
+  key-file: '/etc/kubernetes/pki/etcd/etcd-key.pem'
+  client-cert-auth: true
+  trusted-ca-file: '/etc/kubernetes/pki/etcd/etcd-ca.pem'
+  auto-tls: true
+peer-transport-security:
+  cert-file: '/etc/kubernetes/pki/etcd/etcd.pem'
+  key-file: '/etc/kubernetes/pki/etcd/etcd-key.pem'
+  peer-client-cert-auth: true
+  trusted-ca-file: '/etc/kubernetes/pki/etcd/etcd-ca.pem'
+  auto-tls: true
+debug: false
+log-package-levels:
+log-outputs: [default]
+force-new-cluster: false
 ```
 
-- Front-proxy-client(生成 apiserver 的聚合证书)
+4）创建启动服务并检查数据状态
 
 ```bash
-$ cfssl gencert -initca front-proxy-ca-csr.json | cfssljson -bare /etc/kubernetes/pki/front-proxy-ca 
-$ cfssl gencert \
-  -ca=/etc/kubernetes/pki/front-proxy-ca.pem \
-  -ca-key=/etc/kubernetes/pki/front-proxy-ca-key.pem \
-  -config=ca-config.json -profile=kubernetes \
-  front-proxy-client-csr.json | cfssljson -bare /etc/kubernetes/pki/front-proxy-client
-```
+$ vim /usr/lib/systemd/system/etcd.service
+[Unit]
+Description=Etcd Service
+Documentation=https://coreos.com/etcd/docs/latest/
+After=network.target
 
-- Controller-manage
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/etcd --config-file=/etc/etcd/etcd.config.yml
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
 
-```bash
-$ cfssl gencert \
-  -ca=/etc/kubernetes/pki/ca.pem \
-  -ca-key=/etc/kubernetes/pki/ca-key.pem \
-  -config=ca-config.json \
-  -profile=kubernetes \
-  manager-csr.json | cfssljson -bare /etc/kubernetes/pki/controller-manager
- 
-# set-cluster：设置一个集群项
-$ kubectl config set-cluster kubernetes \
-  --certificate-authority=/etc/kubernetes/pki/ca.pem \
-  --embed-certs=true \
-  --server=https://188.188.4.120:8443 \
-  --kubeconfig=/etc/kubernetes/controller-manager.kubeconfig
+[Install]
+WantedBy=multi-user.target
+Alias=etcd3.service
 
-# set-credentials 设置一个用户项
-$ kubectl config set-credentials system:kube-controller-manager \
-  --client-certificate=/etc/kubernetes/pki/controller-manager.pem \
-  --client-key=/etc/kubernetes/pki/controller-manager-key.pem \
-  --embed-certs=true \
-  --kubeconfig=/etc/kubernetes/controller-manager.kubeconfig
-  
-# 设置一个环境项，一个上下文
-$ kubectl config set-context system:kube-controller-manager@kubernetes \
-  --cluster=kubernetes \
-  --user=system:kube-controller-manager \
-  --kubeconfig=/etc/kubernetes/controller-manager.kubeconfig
 
-# 使用某个环境当做默认环境
-$ kubectl config use-context system:kube-controller-manager@kubernetes \
-  --kubeconfig=/etc/kubernetes/controller-manager.kubeconfig
-```
+$ ln -s /etc/etcd/ssl/* /etc/kubernetes/pki/etcd/
+$ systemctl daemon-reload && systemctl enable --now etcd
 
-- Scheduler
-
-```bash
-$ cfssl gencert \
-  -ca=/etc/kubernetes/pki/ca.pem \
-  -ca-key=/etc/kubernetes/pki/ca-key.pem \
-  -config=ca-config.json \
-  -profile=kubernetes \
-  scheduler-csr.json | cfssljson -bare /etc/kubernetes/pki/scheduler
-
-# set-cluster：设置一个集群项
-$ kubectl config set-cluster kubernetes \
-  --certificate-authority=/etc/kubernetes/pki/ca.pem \
-  --embed-certs=true \
-  --server=https://188.188.4.120:8443 \
-  --kubeconfig=/etc/kubernetes/scheduler.kubeconfig
-
-# set-credentials 设置一个用户项
-$ kubectl config set-credentials system:kube-scheduler \
-  --client-certificate=/etc/kubernetes/pki/scheduler.pem \
-  --client-key=/etc/kubernetes/pki/scheduler-key.pem \
-  --embed-certs=true \
-  --kubeconfig=/etc/kubernetes/scheduler.kubeconfig
-
-# 设置一个环境项，一个上下文
-$ kubectl config set-context system:kube-scheduler@kubernetes \
-  --cluster=kubernetes \
-  --user=system:kube-scheduler \
-  --kubeconfig=/etc/kubernetes/scheduler.kubeconfig
-  
-# 使用某个环境当做默认环境
-$ kubectl config use-context system:kube-scheduler@kubernetes \
-  --kubeconfig=/etc/kubernetes/scheduler.kubeconfig
-```
-
-- Admin
-
-```bash
-$ cfssl gencert \
-  -ca=/etc/kubernetes/pki/ca.pem \
-  -ca-key=/etc/kubernetes/pki/ca-key.pem \
-  -config=ca-config.json \
-  -profile=kubernetes \
-  admin-csr.json | cfssljson -bare /etc/kubernetes/pki/admin
-
-# set-cluster：设置一个集群项
-$ kubectl config set-cluster kubernetes \
-  --certificate-authority=/etc/kubernetes/pki/ca.pem \
-  --embed-certs=true \
-  --server=https://188.188.4.120:8443 \
-  --kubeconfig=/etc/kubernetes/admin.kubeconfig
-  
-# set-credentials 设置一个用户项
-$ kubectl config set-credentials kubernetes-admin \
-  --client-certificate=/etc/kubernetes/pki/admin.pem \
-  --client-key=/etc/kubernetes/pki/admin-key.pem \
-  --embed-certs=true \
-  --kubeconfig=/etc/kubernetes/admin.kubeconfig
-  
-# 设置一个环境项，一个上下文
-$ kubectl config set-context kubernetes-admin@kubernetes \
-  --cluster=kubernetes \
-  --user=kubernetes-admin \
-  --kubeconfig=/etc/kubernetes/admin.kubeconfig
-    
-# 使用某个环境当做默认环境
-$ kubectl config use-context kubernetes-admin@kubernetes \
-  --kubeconfig=/etc/kubernetes/admin.kubeconfig
-```
-
-2）创建 Secret，并将其发至其它节点
-
-```bash
-$ openssl genrsa -out /etc/kubernetes/pki/sa.key 2048
-$ openssl rsa -in /etc/kubernetes/pki/sa.key -pubout -out /etc/kubernetes/pki/sa.pub
-```
-
-```bash
-$ for NODE in k8s-master02 k8s-master03; do 
-  for FILE in $(ls /etc/kubernetes/pki | grep -v etcd); do 
-    scp /etc/kubernetes/pki/${FILE} $NODE:/etc/kubernetes/pki/${FILE};
- done; 
-  for FILE in admin.kubeconfig controller-manager.kubeconfig scheduler.kubeconfig; do 
-    scp /etc/kubernetes/${FILE} $NODE:/etc/kubernetes/${FILE};
- done;
-done
-
-# 查看证书文件
-$ ls /etc/kubernetes/pki/ |wc -l
-23
+$ export ETCDCTL_API=3
+$ etcdctl --endpoints="188.188.4.143:2379,188.188.4.142:2379,188.188.4.141:2379" \
+  --cacert=/etc/kubernetes/pki/etcd/etcd-ca.pem \
+  --cert=/etc/kubernetes/pki/etcd/etcd.pem \
+  --key=/etc/kubernetes/pki/etcd/etcd-key.pem \
+  endpoint status --write-out=table
++--------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+|      ENDPOINT      |        ID        | VERSION | DB SIZE | IS LEADER | IS LEARNER | RAFT TERM | RAFT INDEX | RAFT APPLIED INDEX | ERRORS |
++--------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+| 188.188.4.143:2379 | 6ff5229b3da78f44 |   3.5.4 |  9.8 MB |     false |      false |         3 |      37786 |              37786 |        |
+| 188.188.4.142:2379 | 53bb7c8cf889dc1e |   3.5.4 |  9.8 MB |     false |      false |         3 |      37786 |              37786 |        |
+| 188.188.4.141:2379 | b254a8ee397df155 |   3.5.4 |  9.8 MB |      true |      false |         3 |      37786 |              37786 |        |
++--------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
 ```
 
 ## 高可用配置
 
-> 如不是高可用集群，HAProxy & KeepAlived 无需安装
->
-> 如使用云上托管服务，可直接使用云上 lb，如阿里云 slb、腾讯云 elb 等
+> 1、如不是高可用集群，HAProxy & KeepAlived 无需安装
+> 
+> 2、如使用云上托管服务，可直接使用云上 lb，如阿里云 slb、腾讯云 elb 等
 
-1）所有 Master 节点进行安装
+所有 Master 节点进行安装
 
 ```bash
 $ yum -y install haproxy keepalived
@@ -707,8 +662,9 @@ $ yum -y install haproxy keepalived
 
 ### HAProxy
 
+> 所有 Master 都执行，配置均一样
+
 ```bash
-# 所有Master的HAProxy配置一样
 $ vim /etc/haproxy/haproxy.cfg
 global
   maxconn  2000
@@ -740,18 +696,17 @@ backend k8s-master
   option tcp-check
   balance roundrobin
   default-server inter 10s downinter 5s rise 2 fall 2 slowstart 60s maxconn 250 maxqueue 256 weight 100
-  server k8s-master01    188.188.4.121:6443  check
-  server k8s-master02    188.188.4.122:6443  check
-  server k8s-master03    188.188.4.123:6443  check
+  server dglocal-1884151-k8smaster01    188.188.4.151:6443  check
+  server dglocal-1884152-k8smaster02    188.188.4.152:6443  check
+  server dglocal-1884153-k8smaster03    188.188.4.153:6443  check
 ```
 
 ### KeepAlived
 
-> 所有 Master 节点的 KeepAlived 配置不一样，注意每个节点的IP和网卡（interface参数）
+> 所有 Master 节点的 KeepAlived 配置不一样，注意每个节点的IP/网卡(interface参数)/virtual_router_id
 
-- Master01
-
-```bash
+```sh
+# Master01
 $ vim /etc/keepalived/keepalived.conf
 ! Configuration File for keepalived
 global_defs {
@@ -767,8 +722,8 @@ vrrp_script chk_apiserver {
 vrrp_instance VI_1 {
     state MASTER
     interface eth0
-    mcast_src_ip 188.188.4.121
-    virtual_router_id 120
+    mcast_src_ip 188.188.4.151
+    virtual_router_id 150
     priority 101
     nopreempt
     advert_int 2
@@ -777,16 +732,15 @@ vrrp_instance VI_1 {
         auth_pass K8SHA_KA_AUTH
     }
     virtual_ipaddress {
-        188.188.4.120
+        188.188.4.150
     }
     track_script {
       chk_apiserver 
 } }
 ```
 
-- Master02
-
-```bash
+```sh
+# Master02
 $ vim /etc/keepalived/keepalived.conf
 ! Configuration File for keepalived
 global_defs {
@@ -803,8 +757,8 @@ vrrp_script chk_apiserver {
 vrrp_instance VI_1 {
     state BACKUP
     interface eth0
-    mcast_src_ip 188.188.4.122
-    virtual_router_id 120
+    mcast_src_ip 188.188.4.152
+    virtual_router_id 150
     priority 100
     nopreempt
     advert_int 2
@@ -813,16 +767,15 @@ vrrp_instance VI_1 {
         auth_pass K8SHA_KA_AUTH
     }
     virtual_ipaddress {
-        188.188.4.120
+        188.188.4.150
     }
     track_script {
       chk_apiserver 
 } }
 ```
 
-- Master03
-
 ```bash
+# Master03
 $ vim /etc/keepalived/keepalived.conf
 ! Configuration File for keepalived
 global_defs {
@@ -838,8 +791,8 @@ vrrp_script chk_apiserver {
 vrrp_instance VI_1 {
     state BACKUP
     interface eth0
-    mcast_src_ip 188.188.4.123
-    virtual_router_id 120
+    mcast_src_ip 188.188.4.153
+    virtual_router_id 150
     priority 100
     nopreempt
     advert_int 2
@@ -848,14 +801,14 @@ vrrp_instance VI_1 {
         auth_pass K8SHA_KA_AUTH
     }
     virtual_ipaddress {
-        188.188.4.120
+        188.188.4.150
     }
     track_script {
       chk_apiserver 
 } }
 ```
 
-### 健康检查
+### Check-UP
 
 ```bash
 # 所有Master节点
@@ -883,214 +836,168 @@ else
     exit 0
 fi
 
-# 授权并启动服务测试
 $ chmod +x /etc/keepalived/check_apiserver.sh
 $ systemctl daemon-reload && systemctl enable --now haproxy keepalived
 $ systemctl status haproxy keepalived
 ```
+
 注：安装 HAProxy & KeepAlived 后，需要测试 VIP 是否正常生效
 
-## 组件配置
+## 系统组件
 
-### Etcd
+以下操作均在 MasterNode 上操作，注意 `hostname`/`ServerIP`/`File_path`
 
-> 配置大致相同，注意修改每个 Master 节点的 etcd 配置的主机名和 IP 地址
+### Certificat
 
-1）所有 Master 节点创建配置文件
-
-- Master01
+> 生成各组件模块的证书
 
 ```bash
-$ vim /etc/etcd/etcd.config.yml
-name: 'k8s-master01'
-data-dir: /var/lib/etcd
-wal-dir: /var/lib/etcd/wal
-snapshot-count: 5000
-heartbeat-interval: 100
-election-timeout: 1000
-quota-backend-bytes: 0
-listen-peer-urls: 'https://188.188.4.121:2380'
-listen-client-urls: 'https://188.188.4.121:2379,http://127.0.0.1:2379'
-max-snapshots: 3
-max-wals: 5
-cors:
-initial-advertise-peer-urls: 'https://188.188.4.121:2380'
-advertise-client-urls: 'https://188.188.4.121:2379'
-discovery:
-discovery-fallback: 'proxy'
-discovery-proxy:
-discovery-srv:
-initial-cluster: 'k8s-master01=https://188.188.4.121:2380,k8s-master02=https://188.188.4.122:2380,k8s-master03=https://188.188.4.123:2380'
-initial-cluster-token: 'etcd-k8s-cluster'
-initial-cluster-state: 'new'
-strict-reconfig-check: false
-enable-v2: true
-enable-pprof: true
-proxy: 'off'
-proxy-failure-wait: 5000
-proxy-refresh-interval: 30000
-proxy-dial-timeout: 1000
-proxy-write-timeout: 5000
-proxy-read-timeout: 0
-client-transport-security:
-  cert-file: '/etc/kubernetes/pki/etcd/etcd.pem'
-  key-file: '/etc/kubernetes/pki/etcd/etcd-key.pem'
-  client-cert-auth: true
-  trusted-ca-file: '/etc/kubernetes/pki/etcd/etcd-ca.pem'
-  auto-tls: true
-peer-transport-security:
-  cert-file: '/etc/kubernetes/pki/etcd/etcd.pem'
-  key-file: '/etc/kubernetes/pki/etcd/etcd-key.pem'
-  peer-client-cert-auth: true
-  trusted-ca-file: '/etc/kubernetes/pki/etcd/etcd-ca.pem'
-  auto-tls: true
-debug: false
-log-package-levels:
-log-outputs: [default]
-force-new-cluster: false
+$ cd /root/k8s-install/pki
+$ cfssl gencert -initca ca-csr.json | cfssljson -bare /etc/kubernetes/pki/ca
 ```
 
-- Master02
+- ApiServer
 
-```bash
-$ vim /etc/etcd/etcd.config.yml
-name: 'k8s-master02'
-data-dir: /var/lib/etcd
-wal-dir: /var/lib/etcd/wal
-snapshot-count: 5000
-heartbeat-interval: 100
-election-timeout: 1000
-quota-backend-bytes: 0
-listen-peer-urls: 'https://188.188.4.122:2380'
-listen-client-urls: 'https://188.188.4.122:2379,http://127.0.0.1:2379'
-max-snapshots: 3
-max-wals: 5
-cors:
-initial-advertise-peer-urls: 'https://188.188.4.122:2380'
-advertise-client-urls: 'https://188.188.4.122:2379'
-discovery:
-discovery-fallback: 'proxy'
-discovery-proxy:
-discovery-srv:
-initial-cluster: 'k8s-master01=https://188.188.4.121:2380,k8s-master02=https://188.188.4.122:2380,k8s-master03=https://188.188.4.123:2380'
-initial-cluster-token: 'etcd-k8s-cluster'
-initial-cluster-state: 'new'
-strict-reconfig-check: false
-enable-v2: true
-enable-pprof: true
-proxy: 'off'
-proxy-failure-wait: 5000
-proxy-refresh-interval: 30000
-proxy-dial-timeout: 1000
-proxy-write-timeout: 5000
-proxy-read-timeout: 0
-client-transport-security:
-  cert-file: '/etc/kubernetes/pki/etcd/etcd.pem'
-  key-file: '/etc/kubernetes/pki/etcd/etcd-key.pem'
-  client-cert-auth: true
-  trusted-ca-file: '/etc/kubernetes/pki/etcd/etcd-ca.pem'
-  auto-tls: true
-peer-transport-security:
-  cert-file: '/etc/kubernetes/pki/etcd/etcd.pem'
-  key-file: '/etc/kubernetes/pki/etcd/etcd-key.pem'
-  peer-client-cert-auth: true
-  trusted-ca-file: '/etc/kubernetes/pki/etcd/etcd-ca.pem'
-  auto-tls: true
-debug: false
-log-package-levels:
-log-outputs: [default]
-force-new-cluster: false
+```sh
+$ cfssl gencert \
+  -ca=/etc/kubernetes/pki/ca.pem \
+  -ca-key=/etc/kubernetes/pki/ca-key.pem \
+  -config=ca-config.json \
+  -hostname=15.96.0.1,188.188.4.150,127.0.0.1,kubernetes,kubernetes.default,kubernetes.default.svc,kubernetes.default.svc.cluster,kubernetes.default.svc.cluster.local,188.188.4.151,188.188.4.152,188.188.4.153 \
+  -profile=kubernetes \
+  apiserver-csr.json | cfssljson -bare /etc/kubernetes/pki/apiserver
 ```
 
-- Master03
+- Front-proxy-client
 
 ```bash
-$ vim /etc/etcd/etcd.config.yml
-name: 'k8s-master03'
-data-dir: /var/lib/etcd
-wal-dir: /var/lib/etcd/wal
-snapshot-count: 5000
-heartbeat-interval: 100
-election-timeout: 1000
-quota-backend-bytes: 0
-listen-peer-urls: 'https://188.188.4.123:2380'
-listen-client-urls: 'https://188.188.4.123:2379,http://127.0.0.1:2379'
-max-snapshots: 3
-max-wals: 5
-cors:
-initial-advertise-peer-urls: 'https://188.188.4.123:2380'
-advertise-client-urls: 'https://188.188.4.123:2379'
-discovery:
-discovery-fallback: 'proxy'
-discovery-proxy:
-discovery-srv:
-initial-cluster: 'k8s-master01=https://188.188.4.121:2380,k8s-master02=https://188.188.4.122:2380,k8s-master03=https://188.188.4.123:2380'
-initial-cluster-token: 'etcd-k8s-cluster'
-initial-cluster-state: 'new'
-strict-reconfig-check: false
-enable-v2: true
-enable-pprof: true
-proxy: 'off'
-proxy-failure-wait: 5000
-proxy-refresh-interval: 30000
-proxy-dial-timeout: 1000
-proxy-write-timeout: 5000
-proxy-read-timeout: 0
-client-transport-security:
-  cert-file: '/etc/kubernetes/pki/etcd/etcd.pem'
-  key-file: '/etc/kubernetes/pki/etcd/etcd-key.pem'
-  client-cert-auth: true
-  trusted-ca-file: '/etc/kubernetes/pki/etcd/etcd-ca.pem'
-  auto-tls: true
-peer-transport-security:
-  cert-file: '/etc/kubernetes/pki/etcd/etcd.pem'
-  key-file: '/etc/kubernetes/pki/etcd/etcd-key.pem'
-  peer-client-cert-auth: true
-  trusted-ca-file: '/etc/kubernetes/pki/etcd/etcd-ca.pem'
-  auto-tls: true
-debug: false
-log-package-levels:
-log-outputs: [default]
-force-new-cluster: false
+$ cfssl gencert -initca front-proxy-ca-csr.json | cfssljson -bare /etc/kubernetes/pki/front-proxy-ca 
+$ cfssl gencert \
+  -ca=/etc/kubernetes/pki/front-proxy-ca.pem \
+  -ca-key=/etc/kubernetes/pki/front-proxy-ca-key.pem \
+  -config=ca-config.json -profile=kubernetes \
+  front-proxy-client-csr.json | cfssljson -bare /etc/kubernetes/pki/front-proxy-client
 ```
 
-2）所有 Master 节点创建 Service 服务文件
+- Controller-manager
 
-```bash
-$ vim /usr/lib/systemd/system/etcd.service
-[Unit]
-Description=Etcd Service
-Documentation=https://coreos.com/etcd/docs/latest/
-After=network.target
+```sh
+$ cfssl gencert \
+  -ca=/etc/kubernetes/pki/ca.pem \
+  -ca-key=/etc/kubernetes/pki/ca-key.pem \
+  -config=ca-config.json \
+  -profile=kubernetes \
+  manager-csr.json | cfssljson -bare /etc/kubernetes/pki/controller-manager
+  
+$ kubectl config set-cluster kubernetes \
+  --certificate-authority=/etc/kubernetes/pki/ca.pem \
+  --embed-certs=true \
+  --server=https://188.188.4.150:8443 \
+  --kubeconfig=/etc/kubernetes/controller-manager.kubeconfig
+  
+$ kubectl config set-credentials system:kube-controller-manager \
+  --client-certificate=/etc/kubernetes/pki/controller-manager.pem \
+  --client-key=/etc/kubernetes/pki/controller-manager-key.pem \
+  --embed-certs=true \
+  --kubeconfig=/etc/kubernetes/controller-manager.kubeconfig
+  
+$ kubectl config set-context system:kube-controller-manager@kubernetes \
+  --cluster=kubernetes \
+  --user=system:kube-controller-manager \
+  --kubeconfig=/etc/kubernetes/controller-manager.kubeconfig
+  
+$ kubectl config use-context system:kube-controller-manager@kubernetes \
+  --kubeconfig=/etc/kubernetes/controller-manager.kubeconfig
+```
 
-[Service]
-Type=notify
-ExecStart=/usr/local/bin/etcd --config-file=/etc/etcd/etcd.config.yml
-Restart=on-failure
-RestartSec=10
-LimitNOFILE=65536
+- Scheduler
 
-[Install]
-WantedBy=multi-user.target
-Alias=etcd3.service
+```sh
+$ cfssl gencert \
+  -ca=/etc/kubernetes/pki/ca.pem \
+  -ca-key=/etc/kubernetes/pki/ca-key.pem \
+  -config=ca-config.json \
+  -profile=kubernetes \
+  scheduler-csr.json | cfssljson -bare /etc/kubernetes/pki/scheduler
 
-# 创建etcd的证书目录
-$ mkdir /etc/kubernetes/pki/etcd
-$ ln -s /etc/etcd/ssl/* /etc/kubernetes/pki/etcd/
-$ systemctl daemon-reload && systemctl enable --now etcd
+$ kubectl config set-cluster kubernetes \
+  --certificate-authority=/etc/kubernetes/pki/ca.pem \
+  --embed-certs=true \
+  --server=https://188.188.4.150:8443 \
+  --kubeconfig=/etc/kubernetes/scheduler.kubeconfig
 
-# 查看Etcd状态
-$ export ETCDCTL_API=3
-$ etcdctl --endpoints="188.188.4.123:2379,188.188.4.122:2379,188.188.4.121:2379" \
-  --cacert=/etc/kubernetes/pki/etcd/etcd-ca.pem \
-  --cert=/etc/kubernetes/pki/etcd/etcd.pem \
-  --key=/etc/kubernetes/pki/etcd/etcd-key.pem \
-  endpoint status --write-out=table
+$ kubectl config set-credentials system:kube-scheduler \
+  --client-certificate=/etc/kubernetes/pki/scheduler.pem \
+  --client-key=/etc/kubernetes/pki/scheduler-key.pem \
+  --embed-certs=true \
+  --kubeconfig=/etc/kubernetes/scheduler.kubeconfig
+
+$ kubectl config set-context system:kube-scheduler@kubernetes \
+  --cluster=kubernetes \
+  --user=system:kube-scheduler \
+  --kubeconfig=/etc/kubernetes/scheduler.kubeconfig
+  
+$ kubectl config use-context system:kube-scheduler@kubernetes \
+  --kubeconfig=/etc/kubernetes/scheduler.kubeconfig
+```
+
+- Admin
+
+```sh
+$ cfssl gencert \
+  -ca=/etc/kubernetes/pki/ca.pem \
+  -ca-key=/etc/kubernetes/pki/ca-key.pem \
+  -config=ca-config.json \
+  -profile=kubernetes \
+  admin-csr.json | cfssljson -bare /etc/kubernetes/pki/admin
+
+$ kubectl config set-cluster kubernetes \
+  --certificate-authority=/etc/kubernetes/pki/ca.pem \
+  --embed-certs=true \
+  --server=https://188.188.4.150:8443 \
+  --kubeconfig=/etc/kubernetes/admin.kubeconfig
+  
+$ kubectl config set-credentials kubernetes-admin \
+  --client-certificate=/etc/kubernetes/pki/admin.pem \
+  --client-key=/etc/kubernetes/pki/admin-key.pem \
+  --embed-certs=true \
+  --kubeconfig=/etc/kubernetes/admin.kubeconfig
+  
+$ kubectl config set-context kubernetes-admin@kubernetes \
+  --cluster=kubernetes \
+  --user=kubernetes-admin \
+  --kubeconfig=/etc/kubernetes/admin.kubeconfig
+    
+$ kubectl config use-context kubernetes-admin@kubernetes \
+  --kubeconfig=/etc/kubernetes/admin.kubeconfig
+```
+
+创建 `Secret`，并将其发至其它节点
+
+```sh
+$ openssl genrsa -out /etc/kubernetes/pki/sa.key 2048
+$ openssl rsa -in /etc/kubernetes/pki/sa.key -pubout -out /etc/kubernetes/pki/sa.pub
+
+$ for NODE in dglocal-1884152-k8smaster02 dglocal-1884153-k8smaster03; do echo $NODE;
+  for FILE in $(ls /etc/kubernetes/pki | grep -v etcd); do 
+    scp /etc/kubernetes/pki/${FILE} $NODE:/etc/kubernetes/pki/${FILE};
+ done; 
+  for FILE in admin.kubeconfig controller-manager.kubeconfig scheduler.kubeconfig; do 
+    scp /etc/kubernetes/${FILE} $NODE:/etc/kubernetes/${FILE};
+ done;
+  for FILE in etcd-ca-key.pem etcd-ca.pem etcd-key.pem etcd.pem; do
+    scp /etc/etcd/ssl/${FILE} $NODE:/etc/etcd/ssl/${FILE};
+ done;
+done
+
+# 查看所有Master节点
+$ ls /etc/kubernetes/pki/ |wc -l
+23
 ```
 
 ### ApiServer
 
-> 所有 Master 节点创建 kube-apiserver service，注意如不是高可用集群，188.188.4.120 改为 Master01 地址
+> 所有 Master 节点创建 kube-apiserver service，注意如不是高可用集群，188.188.4.150 改为 Master01 地址
 
 PS：1.24.x Kube-apiserver: 不安全的地址标志 `--address`,`--insecure-bind-address` 和 `--port( --insecure-portinert since 1.20)` 被移除
 
@@ -1115,10 +1022,10 @@ ExecStart=/usr/local/bin/kube-apiserver \
   --allow-privileged=true  \
   --bind-address=0.0.0.0  \
   --secure-port=6443  \
-  --advertise-address=188.188.4.121 \
-  --service-cluster-ip-range=10.96.0.0/16  \
+  --advertise-address=188.188.4.151 \
+  --service-cluster-ip-range=15.96.0.0/16  \
   --service-node-port-range=30000-32767  \
-  --etcd-servers=https://188.188.4.121:2379,https://188.188.4.122:2379,https://188.188.4.123:2379 \
+  --etcd-servers=https://188.188.4.141:2379,https://188.188.4.142:2379,https://188.188.4.143:2379 \
   --etcd-cafile=/etc/etcd/ssl/etcd-ca.pem  \
   --etcd-certfile=/etc/etcd/ssl/etcd.pem  \
   --etcd-keyfile=/etc/etcd/ssl/etcd-key.pem  \
@@ -1132,7 +1039,6 @@ ExecStart=/usr/local/bin/kube-apiserver \
   --service-account-issuer=https://kubernetes.default.svc.cluster.local \
   --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname  \
   --enable-admission-plugins=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota  \
-  # 增加-停止自动生成基于 Secret 的服务帐户令牌
   --feature-gates=LegacyServiceAccountTokenNoAutoGeneration=false \
   --authorization-mode=Node,RBAC  \
   --enable-bootstrap-token-auth=true  \
@@ -1169,10 +1075,10 @@ ExecStart=/usr/local/bin/kube-apiserver \
   --allow-privileged=true  \
   --bind-address=0.0.0.0  \
   --secure-port=6443  \
-  --advertise-address=188.188.4.122 \
-  --service-cluster-ip-range=10.96.0.0/16  \
+  --advertise-address=188.188.4.152 \
+  --service-cluster-ip-range=15.96.0.0/16  \
   --service-node-port-range=30000-32767  \
-  --etcd-servers=https://188.188.4.121:2379,https://188.188.4.122:2379,https://188.188.4.123:2379 \
+  --etcd-servers=https://188.188.4.141:2379,https://188.188.4.142:2379,https://188.188.4.143:2379 \
   --etcd-cafile=/etc/etcd/ssl/etcd-ca.pem  \
   --etcd-certfile=/etc/etcd/ssl/etcd.pem  \
   --etcd-keyfile=/etc/etcd/ssl/etcd-key.pem  \
@@ -1186,7 +1092,6 @@ ExecStart=/usr/local/bin/kube-apiserver \
   --service-account-issuer=https://kubernetes.default.svc.cluster.local \
   --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname  \
   --enable-admission-plugins=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota  \
-  # 增加-停止自动生成基于 Secret 的服务帐户令牌
   --feature-gates=LegacyServiceAccountTokenNoAutoGeneration=false \
   --authorization-mode=Node,RBAC  \
   --enable-bootstrap-token-auth=true  \
@@ -1223,10 +1128,10 @@ ExecStart=/usr/local/bin/kube-apiserver \
   --allow-privileged=true  \
   --bind-address=0.0.0.0  \
   --secure-port=6443  \
-  --advertise-address=188.188.4.123 \
-  --service-cluster-ip-range=10.96.0.0/16  \
+  --advertise-address=188.188.4.153 \
+  --service-cluster-ip-range=15.96.0.0/16  \
   --service-node-port-range=30000-32767  \
-  --etcd-servers=https://188.188.4.121:2379,https://188.188.4.122:2379,https://188.188.4.123:2379 \
+  --etcd-servers=https://188.188.4.141:2379,https://188.188.4.142:2379,https://188.188.4.143:2379 \
   --etcd-cafile=/etc/etcd/ssl/etcd-ca.pem  \
   --etcd-certfile=/etc/etcd/ssl/etcd.pem  \
   --etcd-keyfile=/etc/etcd/ssl/etcd-key.pem  \
@@ -1240,7 +1145,6 @@ ExecStart=/usr/local/bin/kube-apiserver \
   --service-account-issuer=https://kubernetes.default.svc.cluster.local \
   --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname  \
   --enable-admission-plugins=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota  \
-  # 增加-停止自动生成基于 Secret 的服务帐户令牌
   --feature-gates=LegacyServiceAccountTokenNoAutoGeneration=false \
   --authorization-mode=Node,RBAC  \
   --enable-bootstrap-token-auth=true  \
@@ -1261,7 +1165,7 @@ LimitNOFILE=65535
 WantedBy=multi-user.target
 ```
 
-所有 Master 节点开启服务并检查状态
+2）所有 Master 节点开启服务并检查状态
 
 ```bash
 $ systemctl daemon-reload && systemctl enable --now kube-apiserver
@@ -1273,6 +1177,8 @@ $ systemctl status kube-apiserver
 > 所有 Master 节点的 kube-controller-manager service 配置一样
 
 PS：自 v1.20 以来，不安全的地址标志 `--address` 和 `--port` kube-controller-manager 中的标志无效，并在 v1.24 中被删除
+
+1）创建启动的服务文件
 
 ```bash
 $ vim /usr/lib/systemd/system/kube-controller-manager.service
@@ -1290,7 +1196,6 @@ ExecStart=/usr/local/bin/kube-controller-manager \
   --cluster-signing-key-file=/etc/kubernetes/pki/ca-key.pem \
   --service-account-private-key-file=/etc/kubernetes/pki/sa.key \
   --kubeconfig=/etc/kubernetes/controller-manager.kubeconfig \
-  # 增加-停止自动生成基于 Secret 的服务帐户令牌
   --feature-gates=LegacyServiceAccountTokenNoAutoGeneration=false \
   --leader-elect=true \
   --use-service-account-credentials=true \
@@ -1299,7 +1204,7 @@ ExecStart=/usr/local/bin/kube-controller-manager \
   --pod-eviction-timeout=2m0s \
   --controllers=*,bootstrapsigner,tokencleaner \
   --allocate-node-cidrs=true \
-  --cluster-cidr=172.10.0.0/12 \
+  --cluster-cidr=172.15.0.0/12 \
   --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.pem \
   --node-cidr-mask-size=24
       
@@ -1310,18 +1215,20 @@ RestartSec=10s
 WantedBy=multi-user.target
 ```
 
-所有 Master 节点开启服务并检查状态
+2）所有 Master 节点开启服务并检查状态
 
 ```bash
 $ systemctl daemon-reload && systemctl enable --now kube-controller-manager
 $ systemctl status kube-controller-manager
 ```
 
-### Scheduler
+###  Scheduler
 
 > 所有 Master 节点的 kube-scheduler service 配置一样
 
-PS：Kube-scheduler 删除不安全的标志。您可以改用 `--bind-address` 和 `--secure-port`
+1）创建启动的服务文件
+
+PS：Kube-scheduler 删除不安全的标志。可以改用 `--bind-address` 和 `--secure-port`
 
 ```bash
 $ vim /usr/lib/systemd/system/kube-scheduler.service 
@@ -1345,14 +1252,14 @@ RestartSec=10s
 WantedBy=multi-user.target
 ```
 
-所有 Master 节点开启服务并检查状态
+2）所有 Master 节点开启服务并检查状态
 
 ```bash
 $ systemctl daemon-reload && systemctl enable --now kube-scheduler
 $ systemctl status kube-scheduler
 ```
 
-##  TLS Bootstrapping
+## TLS Bootstrapping
 
 > 注：如需修改文件中的 token-id 和 token-secret，需要保持一致
 
@@ -1360,7 +1267,7 @@ $ systemctl status kube-scheduler
 
 - token 的 name 必须是 `bootstrap-token-<token-id>` 的格式
 - token 的 type 必须是 `bootstrap.kubernetes.io/token`
-- token 的 token-id 和 token-secret 分别是6位和16位数字和字母的组合
+- token 的 `token-id` 和 `token-secret` 分别是6位和16位数字和字母的组合
 - `auth-extra-groups` 定义了 token 代表的用户所属的额外的 group，而默认 group 名为 `system:bootstrappers`
 - 这种类型 token 代表的用户名为 `system:bootstrap:<token-id>`，在本文中就是 `system:bootstrap:abcdef`
 
@@ -1369,14 +1276,11 @@ $ systemctl status kube-scheduler
 ```bash
 $ cat /dev/urandom | head -n 22 | md5sum | head -c 22
 dd4414.74c103b52e297e6c
-```
-
-```bash
 $ cd /root/k8s-install/bootstrap
 $ kubectl config set-cluster kubernetes \
   --certificate-authority=/etc/kubernetes/pki/ca.pem \
   --embed-certs=true \
-  --server=https://188.188.4.120:8443 \
+  --server=https://188.188.4.150:8443 \
   --kubeconfig=/etc/kubernetes/bootstrap-kubelet.kubeconfig
 
 $ kubectl config set-credentials tls-bootstrap-token-user \
@@ -1392,11 +1296,8 @@ $ kubectl config use-context tls-bootstrap-token-user@kubernetes \
   --kubeconfig=/etc/kubernetes/bootstrap-kubelet.kubeconfig
 
 $ mkdir -p /root/.kube ; cp /etc/kubernetes/admin.kubeconfig /root/.kube/config
-```
 
-
-2）查看集群状态，正常即可继续操作
-```bash
+# 确认前置配置状态
 $ kubectl get cs
 Warning: v1 ComponentStatus is deprecated in v1.19+
 NAME                 STATUS    MESSAGE                         ERROR
@@ -1415,21 +1316,21 @@ clusterrole.rbac.authorization.k8s.io/system:kube-apiserver-to-kubelet created
 clusterrolebinding.rbac.authorization.k8s.io/system:kube-apiserver created
 ```
 
-## Node
+## WorkNodes
 
-> Master01 节点将证书复制至其他节点
+> Master & Node 均为工作节点 `WorkNode`，
+
+下述操作在所有节点执行，首先将相关证书文件发送至各节点(新节点加入同理)
 
 ```bash
 $ cd /etc/kubernetes/
-$ for NODE in k8s-master02 k8s-master03 k8s-node01 k8s-node02; do
-     ssh $NODE mkdir -p /etc/kubernetes/pki /etc/etcd/ssl
-     for FILE in etcd-ca.pem etcd.pem etcd-key.pem; do
-       scp /etc/etcd/ssl/$FILE $NODE:/etc/etcd/ssl/
-     done
-     for FILE in pki/ca.pem pki/ca-key.pem pki/front-proxy-ca.pem bootstrap-kubelet.kubeconfig; do
-       scp /etc/kubernetes/$FILE $NODE:/etc/kubernetes/${FILE}
- done
- done
+$ MasterNodes='dglocal-1884152-k8smaster02 dglocal-1884153-k8smaster03'
+$ WorkNodes='dglocal-1884161-k8snode01 dglocal-1884162-k8snode02'
+$ for NODE in $MasterNodes $WorkNodes; do echo $NODE;
+    for FILE in pki/ca.pem pki/ca-key.pem pki/front-proxy-ca.pem bootstrap-kubelet.kubeconfig; do
+      scp /etc/kubernetes/$FILE $NODE:/etc/kubernetes/${FILE}
+    done
+  done
 ```
 
 ### Kubelet
@@ -1468,9 +1369,7 @@ Environment="KUBELET_CONFIG_ARGS=--config=/etc/kubernetes/kubelet-conf.yml"
 Environment="KUBELET_EXTRA_ARGS=--node-labels=node.kubernetes.io/node='' "
 ExecStart=
 ExecStart=/usr/local/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_SYSTEM_ARGS $KUBELET_EXTRA_ARGS
-```
-
-```bash
+---------------------------------------------------------------------------------
 $ vim /etc/kubernetes/kubelet-conf.yml
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
@@ -1493,7 +1392,7 @@ authorization:
 cgroupDriver: systemd
 cgroupsPerQOS: true
 clusterDNS:
-- 10.96.0.10
+- 15.96.0.10
 clusterDomain: cluster.local
 containerLogMaxFiles: 5
 containerLogMaxSize: 10Mi
@@ -1544,12 +1443,10 @@ syncFrequency: 1m0s
 volumeStatsAggPeriod: 1m0s
 ```
 
-启动所有节点 kubelet 服务
+3）启动所有节点 kubelet 服务
 
 ```bash
 $ systemctl daemon-reload && systemctl enable --now kubelet
-
-# 状态为Active: active (running)并且输出信息都为I0819才算正常
 $ systemctl status kubelet
 ● kubelet.service - Kubernetes Kubelet
    Loaded: loaded (/usr/lib/systemd/system/kubelet.service; enabled; vendor preset: disabled)
@@ -1567,16 +1464,23 @@ Aug 19 12:05:33 k8s-master01 kubelet[72194]: I0819 12:05:33.688575   72194 state
 Aug 19 12:05:33 k8s-master01 kubelet[72194]: I0819 12:05:33.688594   72194 state_mem.go:96] "Updated CPUSet assignments" assignments=map[]
 ...
 ```
-注意：`Active: active (running)` 并不代表完全正常，信息输出 `E0819` + `Error ...` 同样是失败
+注意：`Active: active (running)` 并不代表完全正常，信息输出 `E0819` + `Error ...` 同样是失败，需要状态为 `Active: active (running)` 并且输出信息都为 `I0819` 才算正常
 
-3）查看系统日志和集群状态
+4）可查看系统日志和集群状态
 
 ```bash
 # 如果正常日志信息不会循环打印
 $ tail -f /var/log/messages
 $ kubectl get node
+NAME                          STATUS   ROLES    AGE     VERSION
+dglocal-1884151-k8smaster01   Ready    <none>   4h17m   v1.24.4
+dglocal-1884152-k8smaster02   Ready    <none>   4h17m   v1.24.4
+dglocal-1884153-k8smaster03   Ready    <none>   4h17m   v1.24.4
+dglocal-1884161-k8snode01     Ready    <none>   4h17m   v1.24.4
+dglocal-1884162-k8snode02     Ready    <none>   4h17m   v1.24.4
 ```
-此处的 `Ready` 不代表 Node 连接正常，还需要配置 Proxy/Calico/CoreDNS
+
+注：此处的 `Ready` 不代表 Node 连接正常，还需要配置 `Proxy/Calico/CoreDNS`
 
 ### Kube-Proxy
 
@@ -1590,18 +1494,16 @@ $ kubectl -n kube-system create serviceaccount kube-proxy
 $ kubectl create clusterrolebinding system:kube-proxy \
   --clusterrole system:node-proxier \
   --serviceaccount kube-system:kube-proxy
-  
-$ SECRET=$(kubectl -n kube-system get sa/kube-proxy \
-  --output=jsonpath='{.secrets[0].name}')
-$ JWT_TOKEN=$(kubectl -n kube-system get secret/$SECRET \
-  --output=jsonpath='{.data.token}' | base64 -d)
+
+$ SECRET=$(kubectl -n kube-system get sa/kube-proxy --output=jsonpath='{.secrets[0].name}')
+$ JWT_TOKEN=$(kubectl -n kube-system get secret/$SECRET --output=jsonpath='{.data.token}' | base64 -d)
 
 $ PKI_DIR=/etc/kubernetes/pki
 $ K8S_DIR=/etc/kubernetes
 $ kubectl config set-cluster kubernetes \
   --certificate-authority=/etc/kubernetes/pki/ca.pem \
   --embed-certs=true \
-  --server=https://188.188.4.120:8443 \
+  --server=https://188.188.4.150:8443 \
   --kubeconfig=${K8S_DIR}/kube-proxy.kubeconfig
 
 $ kubectl config set-credentials kubernetes \
@@ -1613,20 +1515,17 @@ $ kubectl config set-context kubernetes \
   --user=kubernetes \
   --kubeconfig=/etc/kubernetes/kube-proxy.kubeconfig
 
-$ kubectl config use-context kubernetes \
-  --kubeconfig=/etc/kubernetes/kube-proxy.kubeconfig
+$ kubectl config use-context kubernetes --kubeconfig=/etc/kubernetes/kube-proxy.kubeconfig
 ```
 
-2）将 kuberconfig 发至其他节点
+2）将 `kube-proxy.kubeconfig` 发至其他节点
 
 ```bash
-$ for NODE in k8s-master02 k8s-master03; do
-     scp /etc/kubernetes/kube-proxy.kubeconfig  $NODE:/etc/kubernetes/kube-proxy.kubeconfig
- done
-
-$ for NODE in k8s-node01 k8s-node02; do
-     scp /etc/kubernetes/kube-proxy.kubeconfig $NODE:/etc/kubernetes/kube-proxy.kubeconfig
- done
+$ MasterNodes='dglocal-1884152-k8smaster02 dglocal-1884153-k8smaster03'
+$ WorkNodes='dglocal-1884161-k8snode01 dglocal-1884162-k8snode02'
+$ for NODE in $MasterNodes $WorkNodes; do echo $NODE;
+    scp /etc/kubernetes/kube-proxy.kubeconfig  $NODE:/etc/kubernetes/kube-proxy.kubeconfig
+  done
 ```
 
 3）所有节点添加 kube-proxy 的配置和 service 文件
@@ -1648,9 +1547,7 @@ RestartSec=10s
 
 [Install]
 WantedBy=multi-user.target
-```
-
-```bash
+---------------------------------------------------------------------------------
 $ vim /etc/kubernetes/kube-proxy.yaml
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
@@ -1660,7 +1557,7 @@ clientConnection:
   contentType: application/vnd.kubernetes.protobuf
   kubeconfig: /etc/kubernetes/kube-proxy.kubeconfig
   qps: 5
-clusterCIDR: 172.10.0.0/12 
+clusterCIDR: 172.15.0.0/12 
 configSyncPeriod: 15m0s
 conntrack:
   max: null
@@ -1690,7 +1587,7 @@ portRange: ""
 udpIdleTimeout: 250ms
 ```
 
-所有节点启动 kube-proxy
+4）所有节点启动 kube-proxy
 
 ```bash
 $ systemctl daemon-reload && systemctl enable --now kube-proxy
@@ -1730,11 +1627,11 @@ $ curl https://projectcalico.docs.tigera.io/archive/v3.23/manifests/calico-etcd.
 ```bash
 $ curl https://projectcalico.docs.tigera.io/archive/v3.23/manifests/calico-typha.yaml -o calico.yaml
 
-$ POD_SUBNET="172.10.0.0/12"
+$ POD_SUBNET="172.15.0.0/12"
 $ sed -i 's@# - name: CALICO_IPV4POOL_CIDR@- name: CALICO_IPV4POOL_CIDR@g; s@#   value: "192.168.0.0/16"@  value: '"${POD_SUBNET}"'@g' calico.yaml
 $ grep "IPV4POOL_CIDR" calico.yaml -A 1
             - name: CALICO_IPV4POOL_CIDR
-              value: "172.10.0.0/12"
+              value: "172.15.0.0/12"
 
 $ kubectl apply -f calico.yaml
 configmap/calico-config created
@@ -1769,27 +1666,30 @@ deployment.apps/calico-kube-controllers created
 serviceaccount/calico-kube-controllers created
 poddisruptionbudget.policy/calico-kube-controllers created
 
-$ kubectl get po -n kube-system
-NAME                                     READY   STATUS    RESTARTS   AGE
-calico-kube-controllers-75f9f667-lq7g6   1/1     Running   0          110s
-calico-node-bhdcc                        1/1     Running   0          110s
-calico-node-c5drh                        1/1     Running   0          110s
-calico-node-d9k6f                        1/1     Running   0          110s
-calico-node-dqfrw                        1/1     Running   0          110s
-calico-node-vjpc8                        1/1     Running   0          110s
-calico-typha-6ff7d69c7f-4l85l            1/1     Running   0          110s
+$ kubectl get po -A
+NAMESPACE              NAME                                         READY   STATUS    RESTARTS       AGE
+kube-system            calico-kube-controllers-6754f569c-2rd5f      1/1     Running   4 (135m ago)   4h15m
+kube-system            calico-node-85tx2                            1/1     Running   2 (135m ago)   4h15m
+kube-system            calico-node-96n9q                            1/1     Running   2 (135m ago)   4h15m
+kube-system            calico-node-dwrkq                            1/1     Running   2 (135m ago)   4h15m
+kube-system            calico-node-gg9h4                            1/1     Running   2 (135m ago)   4h15m
+kube-system            calico-node-szlt6                            1/1     Running   2 (135m ago)   4h15m
+kube-system            calico-typha-bb4f6c8b5-tfdvs                 1/1     Running   2 (135m ago)   4h15m
 
 $ crictl pods
-POD ID              CREATED              STATE               NAME                                     NAMESPACE           ATTEMPT             RUNTIME
-a4b9cf3836b68       About a minute ago   Ready               calico-kube-controllers-75f9f667-lq7g6   kube-system         0                   (default)
-dd1ad0d486726       About a minute ago   Ready               calico-node-vjpc8                        kube-system         0                   (default)
+POD ID              CREATED             STATE               NAME                           NAMESPACE           ATTEMPT             RUNTIME
+eea868a019521       2 hours ago         Ready               calico-node-gg9h4              kube-system         2                   (default)
+f6cf0c2127d7c       2 hours ago         Ready               calico-typha-bb4f6c8b5-tfdvs   kube-system         2                   (default)
+b7e8bd00ed826       4 hours ago         NotReady            calico-node-gg9h4              kube-system         1                   (default)
+ff9cc515c391e       4 hours ago         NotReady            calico-typha-bb4f6c8b5-tfdvs   kube-system         1                   (default)
 
 $ crictl images
-IMAGE                                                        TAG                 IMAGE ID            SIZE
-registry.cn-hangzhou.aliyuncs.com/google_containers/pause    3.6                 6270bb605e12e       302kB
-registry.cn-hongkong.aliyuncs.com/yuikuen/cni                v3.23.3             f0c59ea5f2652       108MB
-registry.cn-hongkong.aliyuncs.com/yuikuen/kube-controllers   v3.23.3             a47d709fe3a65       53.8MB
-registry.cn-hongkong.aliyuncs.com/yuikuen/node               v3.23.3             5f5175f39b19e       73.5MB
+IMAGE                                                          TAG                 IMAGE ID            SIZE
+registry.cn-hangzhou.aliyuncs.com/google_containers/pause      3.6                 6270bb605e12e       302kB
+registry.cn-hongkong.aliyuncs.com/yuikuen/cni                  v3.22.4             64a041d6e4236       77.9MB
+registry.cn-hongkong.aliyuncs.com/yuikuen/node                 v3.22.4             3a6768785333d       71.4MB
+registry.cn-hongkong.aliyuncs.com/yuikuen/pod2daemon-flexvol   v3.22.4             016bb666554ef       8.66MB
+registry.cn-hongkong.aliyuncs.com/yuikuen/typha                v3.22.4             5c116e2d13d34       51.4MB
 ```
 
 - **with etcd datastore**
@@ -1804,13 +1704,13 @@ registry.cn-hongkong.aliyuncs.com/yuikuen/node               v3.23.3            
 ```bash
 $ curl https://projectcalico.docs.tigera.io/archive/v3.23/manifests/calico-etcd.yaml -o calico.yaml
 
-$ sed -i 's#etcd_endpoints: "http://<ETCD_IP>:<ETCD_PORT>"#etcd_endpoints: "https://188.188.4.121:2379,https://188.188.4.122:2379,https://188.188.4.123:2379"#g' calico-etcd.yaml
+$ sed -i 's#etcd_endpoints: "http://<ETCD_IP>:<ETCD_PORT>"#etcd_endpoints: "https://188.188.4.151:2379,https://188.188.4.152:2379,https://188.188.4.153:2379"#g' calico-etcd.yaml
 $ ETCD_CA=`cat /etc/kubernetes/pki/etcd/etcd-ca.pem | base64 | tr -d '\n'`
 $ ETCD_CERT=`cat /etc/kubernetes/pki/etcd/etcd.pem | base64 | tr -d '\n'`
 $ ETCD_KEY=`cat /etc/kubernetes/pki/etcd/etcd-key.pem | base64 | tr -d '\n'`
 $ sed -i "s@# etcd-key: null@etcd-key: ${ETCD_KEY}@g; s@# etcd-cert: null@etcd-cert: ${ETCD_CERT}@g; s@# etcd-ca: null@etcd-ca: ${ETCD_CA}@g" calico-etcd.yaml
 $ sed -i 's#etcd_ca: ""#etcd_ca: "/calico-secrets/etcd-ca"#g; s#etcd_cert: ""#etcd_cert: "/calico-secrets/etcd-cert"#g; s#etcd_key: "" #etcd_key: "/calico-secrets/etcd-key" #g' calico-etcd.yaml
-$ POD_SUBNET="172.10.0.0/12"
+$ POD_SUBNET="172.15.0.0/12"
 $ sed -i 's@# - name: CALICO_IPV4POOL_CIDR@- name: CALICO_IPV4POOL_CIDR@g; s@#   value: "192.168.0.0/16"@  value: '"${POD_SUBNET}"'@g' calico-etcd.yaml
 
 $ kubectl apply -f calico.yaml
@@ -1833,10 +1733,10 @@ $ kubectl get po -n kube-system
 $ cd /root/k8s-install/CoreDNS
 $ COREDNS_SERVICE_IP=`kubectl get svc | grep kubernetes | awk '{print $3}'`0
 $ echo $COREDNS_SERVICE_IP
-10.96.0.10
+15.96.0.10
 $ sed -i "s#CLUSTER_DNS_IP#${COREDNS_SERVICE_IP}#g" coredns.yaml
 $ grep "clusterIP" coredns.yaml 
-  clusterIP: 10.96.0.10
+  clusterIP: 15.96.0.10
   
 $ kubectl create -f coredns.yaml 
 serviceaccount/coredns created
@@ -1859,7 +1759,7 @@ coredns-5db5696c7-cj577   1/1     Running   0          14s
 ```bash
 $ COREDNS_SERVICE_IP=`kubectl get svc | grep kubernetes | awk '{print $3}'`0
 $ echo $COREDNS_SERVICE_IP
-10.96.0.10
+15.96.0.10
 
 $ git clone https://github.com/coredns/deployment.git
 $ cd deployment/kubernetes

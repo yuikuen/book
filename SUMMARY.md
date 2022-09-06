@@ -52,6 +52,7 @@
 
 * [K8s_Install-1.23.x(SRC)](Kubernetes/k8s_install-1.23.x(src).md)
 * [K8s_Install-1.24.x(SRC)](Kubernetes/k8s_install-1.24.x(src).md)
+* [K8s_Install-1.24.x(SRC-DataAlone)](Kubernetes/k8s_install-1.24.x(src-data%20alone).md)
 * [K8s_Kubectl](Kubernetes/k8s_kubectl.md)
 * [K8s_Calico-bug](Kubernetes/k8s_calico-bug.md)
 

@@ -61,7 +61,3 @@ $ cat /etc/systemd/system/containerd.service
 $ systemctl enable --now containerd
 $ ctr version
 ```
-
-## 配置镜像加速
-
-1）
