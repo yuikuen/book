@@ -62,7 +62,7 @@ $ rpm -qa | grep mariadb | xargs yum remove -y
 
 ## 程序安装
 
-1)删除旧版本的 MySQL 及相关配置文件，并安装相关依赖软件
+1）删除旧版本的 MySQL 及相关配置文件，并安装相关依赖软件
 
 ```bash
 $ rpm -qa mysql
@@ -71,7 +71,7 @@ $ rpm -e --nodeps mariadb-libs 文件名
 $ rm -rf /etc/my.cnf
 ```
 
-2)下载依赖包&程序包，根据需求进行解压配置安装
+2）下载依赖包&程序包，根据需求进行解压配置安装
 
 ```bash
 $ yum -y install ncurses-devel cmake libaio-devel openssl-devel gcc gcc-c++ bison
@@ -80,7 +80,7 @@ $ cd mysql-5.7.37
 ```
 注：环境不一样，可能还需要安装其他依赖包，比如 perl 相关的包
 
-3)基于 cmake 进行配置
+3）基于 cmake 进行配置
 
 ```bash
 $ cmake . \
@@ -107,7 +107,7 @@ $ cmake . \
 -DMYSQL_UNIX_ADDR ：套接字文件位置
 ```
 
-4)开始编译安装
+4）开始编译安装
 
 ```bash
 $ make -j2 && make install
@@ -117,14 +117,14 @@ $ make -j2 && make install
 
 ## 数据初始化
 
-1)创建一个数据库专用账号 mysql(其所属组也为 mysql)
+1）创建一个数据库专用账号 mysql(其所属组也为 mysql)
 
 ```bash
 $ useradd -r -s /sbin/nologin mysql
 $ id mysql
 ```
 
-2)修改目录权限，并进入安装目录执行初始化操作
+2）修改目录权限，并进入安装目录执行初始化操作
 
 ```bash
 $ chown -R mysql:mysql /usr/local/mysql
@@ -135,7 +135,7 @@ $ bin/mysqld --initialize --user=mysql --basedir=/usr/local/mysql --datadir=/usr
 2022-04-03T02:43:31.295939Z 1 [Note] A temporary password is generated for root@localhost: e!m#BqYjf9OG
 ```
 
-3)拷贝 mysql.server 脚本到 `/etc/init.d` 目录，然后启动数据库
+3）拷贝 mysql.server 脚本到 `/etc/init.d` 目录，然后启动数据库
 
 ```bash
 $ cp support-files/mysql.server /etc/init.d/mysql
@@ -144,7 +144,7 @@ Starting MySQL.Logging to '/usr/local/mysql/data/Dev-Pc.err'.
  SUCCESS!
 ```
 
-4)编写 MySQL 配置文件
+4）编写 MySQL 配置文件
 
 ```bash
 $ vim my.cnf
@@ -161,7 +161,57 @@ Shutting down MySQL.. SUCCESS!
 Starting MySQL. SUCCESS!
 ```
 
-5)修改管理员密码
+```bash
+# 配置文件参考
+$ cat /etc/my.cnf
+[client]
+port=3306
+socket=/tmp/mysql.sock
+
+[mysqld]
+port = 3306
+socket=/tmp/mysql.sock
+user = mysql
+server-id = 1
+basedir = /opt/mysql
+datadir = /opt/mysql/data
+pid-file = /opt/mysql/data/mysqld.pid
+
+default_storage_engine = InnoDB
+max_allowed_packet = 512M
+max_connections = 2048
+open_files_limit = 65535
+explicit_defaults_for_timestamp = 1
+
+skip-name-resolve
+lower_case_table_names=1
+
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+init_connect='SET NAMES utf8mb4'
+
+innodb_buffer_pool_size = 512M
+innodb_log_file_size = 1024M
+innodb_file_per_table = 1
+innodb_flush_log_at_trx_commit = 0
+
+key_buffer_size = 64M
+
+log-error = /opt/mysql/logs/error.log
+log-bin = /opt/mysql/logs/binlog/mysql-bin
+
+binlog_format = mixed
+expire_logs_days = 10
+
+slow_query_log = 1
+slow_query_log_file = /opt/mysql/logs/slow.log
+long_query_time = 1
+
+[mysqldump]
+quick
+```
+
+5）修改管理员密码
 
 ```bash
 $ bin/mysqladmin -uroot password 'newpassword' -p
@@ -170,7 +220,7 @@ mysqladmin: [Warning] Using a password on the command line interface can be inse
 Warning: Since password will be sent to server in plain text, use ssl connection to ensure password safety.
 ```
 
-6)测试密码修改是否成功
+6）测试密码修改是否成功
 
 ```mysql
 $ bin/mysql -uroot -p
@@ -190,7 +240,7 @@ Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 mysql>
 ```
 
-7)修改安全配置
+7）修改安全配置
 
 ```mysql
 $ bin/mysql_secure_installation
@@ -218,7 +268,7 @@ Remove anonymous users? (Press y|Y for Yes, any other key for No) : y
 Success.
 ```
 
-8)添加服务至开机启动项，并配置环境变量
+8）添加服务至开机启动项，并配置环境变量
 
 ```bash
 $ chkconfig --add mysql
@@ -229,4 +279,34 @@ $ vim /etc/profile
 export MYSQL_HOME=/usr/local/mysql
 export PATH=$PATH:$MYSQL_HOME/bin
 $ source /etc/profile
+```
+
+```bash
+# 启动文件参考
+$ cat /etc/systemd/system/mysqld.service
+[Unit]
+Description=MySQL Server
+Documentation=man:mysqld(7)
+Documentation=http://dev.mysql.com/doc/refman/en/using-systemd.html
+After=network.target
+After=syslog.target
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+User=mysql
+Group=mysql
+
+Type=forking
+PIDFile=/opt/mysql/data/mysqld.pid
+TimeoutSec=0
+
+ExecStart=/opt/mysql/bin/mysqld --defaults-file=/opt/mysql/etc/my.cnf --daemonize --pid-file=/opt/mysql/data/mysqld.pid $MYSQLD_OPTS 
+EnvironmentFile=-/etc/sysconfig/mysql
+
+LimitNOFILE = 5000
+Restart=on-failure
+RestartPreventExitStatus=1
+PrivateTmp=false
 ```
