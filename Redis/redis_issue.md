@@ -1,4 +1,4 @@
-# Redis Bug
+# Redis Issue
 
 > 异常问题记录和解决方案
 
@@ -53,3 +53,39 @@ $ vim ./redis.conf
   75 #bind 127.0.0.1 -::1
   76 bind 0.0.0.0
 ```
+
+## 问题五
+
+错误提示：`Redis cluster_state:fail`  `CLUSTERDOWN Hash slot not served`
+
+**问题** 搭建的 Redis 集群，正常启动并登录，但无法使用
+
+```bash
+$ kubectl -n public-service  exec -it drc-redis-0-0 -- redis-cli cluster info
+cluster_state:fail
+cluster_slots_assigned:16380
+cluster_slots_ok:16380
+cluster_slots_pfail:0
+cluster_slots_fail:0
+cluster_known_nodes:6
+cluster_size:3
+cluster_current_epoch:8
+cluster_my_epoch:1
+cluster_stats_messages_sent:1007
+
+# 登陆进去测试
+xxx.xxx.xxx.xxx>set test aaa
+报错(error) CLUSTERDOWN Hash slot not served
+```
+
+**原因** 没有分配槽，因为 redis 集群要分配 16384 个槽来储存数据，那么没有分配槽则报如上错误
+
+**解决方案** 执行下面步骤来修复
+
+```bash
+$ kubectl -n public-service  exec -it drc-redis-0-0 -- redis-cli cluster check 127.0.0.1:6379
+[ERR] Not all 16384 slots are covered by nodes
+$ kubectl -n public-service  exec -it drc-redis-0-0 -- redis-cli cluster fix 127.0.0.1:6379
+```
+
+询问的时候记得输入 yes，不要输入 y

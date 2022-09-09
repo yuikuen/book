@@ -8,6 +8,7 @@
 - Cmake：cmake-3.24.1
 - Gcc：gcc version 10.2.1
 - Devtoolset：devtoolset-10
+- MySQL：mysql-boost-8.0.28
 
 卸载默认的 `mariadb`
 

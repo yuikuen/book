@@ -30,7 +30,7 @@
 
 ## Gitlab
 
-* [GitLab_Install](GitLab/gitlab_install.md)
+* [GitLab_Install](GitLab/gitlab_install(rpm).md)
 * [GitLab_LDAP](GitLab/gitlab_ldap.md)
 
 ## Harbor

@@ -1,4 +1,4 @@
-# NextCloud Bug
+# NextCloud Issue
 
 > 记录一些运作中发现的问题
 > 
