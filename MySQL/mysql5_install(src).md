@@ -1,6 +1,6 @@
-# MySQL5.7 Install(SRC)
+# MySQL5 Install(SRC)
 
-> MySQL5.7.x 以上版本编译安装都依赖 boost 库
+> MySQL5.7.x 源码安装，5.7 以上版本安装都依赖 boost 库
 
 ## 版本环境
 

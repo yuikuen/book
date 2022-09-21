@@ -134,3 +134,36 @@ nginx   3162 gitlab-www    7u  IPv4  28763      0t0  TCP *:http (LISTEN)
 ```
 
 ![](https://yuikuen-1259273046.cos.ap-guangzhou.myqcloud.com/devops/image-20220111183425464.png)
+
+## 程序&目录
+
+GitLab由主要由以下服务构成，他们共同承担了Gitlab的运作需要
+
+- nginx: 静态web服务器
+- gitlab-shell: 用于处理Git命令和修改authorized keys列表
+- gitlab-workhorse: 轻量级的反向代理服务器
+- logrotate：日志文件管理工具
+- postgresql：数据库
+- redis：缓存数据库
+- sidekiq：用于在后台执行队列任务（异步执行）
+- unicorn：HTTP服务，GitLab Rails应用是托管在这个服务器上面的
+
+主要程序目录
+
+- 主配置文件: /etc/gitlab/gitlab.rb
+- 文档根目录: /opt/gitlab
+- 默认存储库位置: /var/opt/gitlab/git-data/repositories
+- Nginx配置文件: /var/opt/gitlab/nginx/conf/gitlab-http.conf
+- Postgresql数据目录: /var/opt/gitlab/postgresql/data
+
+## 基本操作
+
+- 控制台打开：gitlab-rails
+- 数据库命令：gitlab-psql
+- 数据备份还原：gitlab-rake
+- 客户端操作命令：gitlab-ctl
+  - 启动：gitlab-ctl start
+  - 停止：gitlab-ctl stop
+  - 重启：gitlab-ctl restart
+  - 查看：gitlab-ctl status
+  - 日志：gitlab-ctl tail nginx(组件)

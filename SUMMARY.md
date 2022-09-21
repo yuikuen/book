@@ -198,7 +198,7 @@
 
 * [Auto_Clean-cache](Shell/auto_clean-cache.md)
 * [Auto_Kernel-Update](Shell/auto_kernel-update.md)
-* [Auto_System-init](Basics/basics_system-init.md)
+* [Auto_System-init](Shell/auto_system-init.md)
 * [Auto_System-patrol](Shell/auto_system-patrol.md)
 * [Auto_Redis-init](Shell/auto_redis-install.md)
 * [Shell_Issue](Shell/shell_issue.md)
